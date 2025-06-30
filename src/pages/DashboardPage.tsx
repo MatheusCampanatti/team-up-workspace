@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -189,6 +188,10 @@ const DashboardPage = () => {
     navigate('/auth');
   };
 
+  const viewCompanyBoards = (companyId: string) => {
+    navigate(`/company/${companyId}/boards`);
+  };
+
   if (!user) {
     return null;
   }
@@ -326,10 +329,17 @@ const DashboardPage = () => {
                     Created {new Date(company.created_at).toLocaleDateString()}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                   <p className="text-sm text-gray-600">
                     You are an {company.role} of this company.
                   </p>
+                  <Button 
+                    onClick={() => viewCompanyBoards(company.id)}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    View Boards
+                  </Button>
                 </CardContent>
               </Card>
             ))}
