@@ -9,161 +9,26 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      boards: {
-        Row: {
-          company_id: string
-          created_at: string | null
-          created_by: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          company_id: string
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          company_id?: string
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "boards_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      columns: {
-        Row: {
-          board_id: string
-          created_at: string | null
-          id: string
-          name: string
-          type: string
-        }
-        Insert: {
-          board_id: string
-          created_at?: string | null
-          id?: string
-          name: string
-          type: string
-        }
-        Update: {
-          board_id?: string
-          created_at?: string | null
-          id?: string
-          name?: string
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "columns_board_id_fkey"
-            columns: ["board_id"]
-            isOneToOne: false
-            referencedRelation: "boards"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       companies: {
         Row: {
           created_at: string
-          created_by: string
           id: string
           name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
-          created_by?: string
           id?: string
           name: string
           updated_at?: string
         }
         Update: {
           created_at?: string
-          created_by?: string
           id?: string
           name?: string
           updated_at?: string
         }
         Relationships: []
-      }
-      item_values: {
-        Row: {
-          column_id: string | null
-          id: string
-          item_id: string | null
-          updated_at: string | null
-          value: string | null
-        }
-        Insert: {
-          column_id?: string | null
-          id?: string
-          item_id?: string | null
-          updated_at?: string | null
-          value?: string | null
-        }
-        Update: {
-          column_id?: string | null
-          id?: string
-          item_id?: string | null
-          updated_at?: string | null
-          value?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "item_values_column_id_fkey"
-            columns: ["column_id"]
-            isOneToOne: false
-            referencedRelation: "columns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_values_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      items: {
-        Row: {
-          board_id: string
-          created_at: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          board_id: string
-          created_at?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          board_id?: string
-          created_at?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "items_board_id_fkey"
-            columns: ["board_id"]
-            isOneToOne: false
-            referencedRelation: "boards"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       profiles: {
         Row: {
