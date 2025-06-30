@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -64,16 +65,31 @@ const DashboardPage = () => {
         throw error;
       }
 
+      // Create user role for the new company
+      const { error: roleError } = await supabase
+        .from("user_company_roles")
+        .insert({
+          user_id: user!.id,
+          company_id: data.id,
+          role: "Admin",
+        });
+
+      if (roleError) {
+        console.error("Error creating user role:", roleError);
+        throw roleError;
+      }
+
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
       setNewCompanyName("");
       setShowCreateForm(false);
       toast({
         title: "Success",
         description: "Company created successfully!",
       });
+      // Refresh the page to reload companies from AuthContext
+      window.location.reload();
     },
     onError: (error: any) => {
       console.error("Failed to create company:", error);
@@ -165,7 +181,7 @@ const DashboardPage = () => {
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-6">Your Companies</h2>
           
-          {isLoading ? (
+          {isAuthLoading ? (
             <div className="flex justify-center items-center py-12">
               <div className="text-gray-500">Loading companies...</div>
             </div>

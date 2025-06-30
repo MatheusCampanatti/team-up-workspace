@@ -3,10 +3,19 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+interface Company {
+  id: string;
+  name: string;
+  role: string;
+  created_at: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  companies: Company[];
+  isLoading: boolean;
   signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -26,6 +35,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch companies for the current user
+  const fetchCompanies = async (userId: string) => {
+    try {
+      console.log('Fetching companies for user:', userId);
+      
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_company_roles')
+        .select('company_id, role')
+        .eq('user_id', userId);
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        return;
+      }
+
+      if (!userRoles || userRoles.length === 0) {
+        console.log('No roles found for user');
+        setCompanies([]);
+        return;
+      }
+
+      const companyIds = userRoles.map(role => role.company_id);
+      console.log('Company IDs:', companyIds);
+
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('*')
+        .in('id', companyIds);
+
+      if (companiesError) {
+        console.error('Error fetching companies:', companiesError);
+        return;
+      }
+
+      const companiesWithRoles = companiesData?.map(company => {
+        const userRole = userRoles.find(role => role.company_id === company.id);
+        return {
+          ...company,
+          role: userRole?.role || 'Member'
+        };
+      }) || [];
+
+      console.log('Companies with roles:', companiesWithRoles);
+      setCompanies(companiesWithRoles);
+    } catch (error) {
+      console.error('Unexpected error fetching companies:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener
@@ -35,6 +97,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        if (session?.user) {
+          fetchCompanies(session.user.id);
+        } else {
+          setCompanies([]);
+          setIsLoading(false);
+        }
       }
     );
 
@@ -43,6 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      if (session?.user) {
+        fetchCompanies(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -72,12 +147,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setCompanies([]);
   };
 
   const value = {
     user,
     session,
     loading,
+    companies,
+    isLoading,
     signUp,
     signIn,
     signOut
