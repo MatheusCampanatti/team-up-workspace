@@ -91,11 +91,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      user_belongs_to_company: {
-        Args: { _user_id: string; _company_id: string }
-        Returns: boolean
-      }
-      user_is_company_admin: {
+      check_user_is_admin: {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
       }

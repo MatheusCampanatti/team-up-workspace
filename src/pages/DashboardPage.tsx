@@ -46,6 +46,7 @@ const DashboardPage = () => {
   const fetchProfile = async () => {
     if (!user) return;
     
+    console.log('Fetching profile for user:', user.id);
     const { data, error } = await supabase
       .from('profiles')
       .select('name, email')
@@ -55,6 +56,7 @@ const DashboardPage = () => {
     if (error) {
       console.error('Error fetching profile:', error);
     } else {
+      console.log('Profile data:', data);
       setProfile(data);
     }
   };
@@ -63,32 +65,65 @@ const DashboardPage = () => {
     if (!user) return;
     
     setLoading(true);
-    const { data, error } = await supabase
+    console.log('Fetching companies for user:', user.id);
+    
+    // First, let's get all companies the user has roles in
+    const { data: roleData, error: roleError } = await supabase
       .from('user_company_roles')
-      .select(`
-        role,
-        companies (
-          id,
-          name,
-          created_at
-        )
-      `)
+      .select('company_id, role')
       .eq('user_id', user.id);
     
-    if (error) {
-      console.error('Error fetching companies:', error);
+    if (roleError) {
+      console.error('Error fetching user roles:', roleError);
+      toast({
+        title: 'Error loading user roles',
+        description: roleError.message,
+        variant: 'destructive'
+      });
+      setLoading(false);
+      return;
+    }
+
+    console.log('User roles data:', roleData);
+
+    if (!roleData || roleData.length === 0) {
+      console.log('No roles found for user');
+      setCompanies([]);
+      setLoading(false);
+      return;
+    }
+
+    // Extract company IDs
+    const companyIds = roleData.map(role => role.company_id);
+    
+    // Now fetch the company details
+    const { data: companiesData, error: companiesError } = await supabase
+      .from('companies')
+      .select('id, name, created_at')
+      .in('id', companyIds);
+    
+    if (companiesError) {
+      console.error('Error fetching companies:', companiesError);
       toast({
         title: 'Error loading companies',
-        description: error.message,
+        description: companiesError.message,
         variant: 'destructive'
       });
     } else {
-      const formattedCompanies = data?.map(item => ({
-        id: item.companies.id,
-        name: item.companies.name,
-        created_at: item.companies.created_at,
-        role: item.role
-      })) || [];
+      console.log('Companies data:', companiesData);
+      
+      // Combine company data with role information
+      const formattedCompanies = companiesData?.map(company => {
+        const userRole = roleData.find(role => role.company_id === company.id);
+        return {
+          id: company.id,
+          name: company.name,
+          created_at: company.created_at,
+          role: userRole?.role || 'Unknown'
+        };
+      }) || [];
+      
+      console.log('Formatted companies:', formattedCompanies);
       setCompanies(formattedCompanies);
     }
     setLoading(false);
@@ -98,6 +133,8 @@ const DashboardPage = () => {
     e.preventDefault();
     if (!user || !newCompanyName.trim()) return;
 
+    console.log('Creating company:', newCompanyName);
+
     try {
       // Create the company
       const { data: companyData, error: companyError } = await supabase
@@ -106,7 +143,12 @@ const DashboardPage = () => {
         .select()
         .single();
 
-      if (companyError) throw companyError;
+      if (companyError) {
+        console.error('Error creating company:', companyError);
+        throw companyError;
+      }
+
+      console.log('Company created:', companyData);
 
       // Add user as Admin to the company
       const { error: roleError } = await supabase
@@ -117,7 +159,12 @@ const DashboardPage = () => {
           role: 'Admin'
         }]);
 
-      if (roleError) throw roleError;
+      if (roleError) {
+        console.error('Error creating user role:', roleError);
+        throw roleError;
+      }
+
+      console.log('User role created successfully');
 
       toast({
         title: 'Company created!',
@@ -128,6 +175,7 @@ const DashboardPage = () => {
       setIsDialogOpen(false);
       fetchCompanies(); // Refresh the list
     } catch (error: any) {
+      console.error('Error in createCompany:', error);
       toast({
         title: 'Error creating company',
         description: error.message,
