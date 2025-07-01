@@ -1,12 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import CellEditor from './CellEditor';
 
 interface Column {
   id: string;
@@ -15,6 +15,8 @@ interface Column {
   board_id: string;
   order: number | null;
   created_at: string;
+  options?: string[] | null;
+  is_readonly?: boolean | null;
 }
 
 interface Item {
@@ -154,6 +156,30 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     }
   };
 
+  const createDefaultItemValues = async (itemId: string) => {
+    const valuesToCreate = columns.map(column => ({
+      item_id: itemId,
+      column_id: column.id,
+      value: column.type === 'timestamp' ? new Date().toISOString() : '',
+    }));
+
+    if (valuesToCreate.length > 0) {
+      const { data, error } = await supabase
+        .from('item_values')
+        .insert(valuesToCreate)
+        .select();
+
+      if (error) {
+        console.error('Error creating default item values:', error);
+        return;
+      }
+
+      if (data) {
+        setItemValues(prev => [...prev, ...data]);
+      }
+    }
+  };
+
   const addNewItem = async () => {
     if (!newItemName.trim()) return;
 
@@ -176,9 +202,12 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      if (data) {
+      if (data && data[0]) {
         setItems(prev => [...prev, ...data]);
         setNewItemName('');
+        
+        // Create default values for all columns
+        await createDefaultItemValues(data[0].id);
       }
     } catch (error) {
       console.error('Unexpected error adding item:', error);
@@ -216,80 +245,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     } catch (error) {
       console.error('Unexpected error adding column:', error);
     }
-  };
-
-  const renderCellInput = (item: Item, column: Column) => {
-    const cellKey = `${item.id}-${column.id}`;
-    const currentValue = getItemValue(item.id, column.id);
-    const isEditing = editingCell === cellKey;
-
-    if (!isEditing) {
-      return (
-        <div
-          className="min-h-[2rem] p-2 cursor-pointer hover:bg-gray-50 rounded border-transparent border"
-          onClick={() => setEditingCell(cellKey)}
-        >
-          {column.type === 'checkbox' ? (
-            <Checkbox
-              checked={currentValue === 'true'}
-              onCheckedChange={(checked) => {
-                updateItemValue(item.id, column.id, checked ? 'true' : 'false');
-              }}
-            />
-          ) : (
-            <span className="text-sm">{currentValue || 'Click to edit'}</span>
-          )}
-        </div>
-      );
-    }
-
-    if (column.type === 'checkbox') {
-      return (
-        <Checkbox
-          checked={currentValue === 'true'}
-          onCheckedChange={(checked) => {
-            updateItemValue(item.id, column.id, checked ? 'true' : 'false');
-            setEditingCell(null);
-          }}
-          autoFocus
-        />
-      );
-    }
-
-    if (column.type === 'textarea') {
-      return (
-        <Textarea
-          value={currentValue}
-          onChange={(e) => updateItemValue(item.id, column.id, e.target.value)}
-          onBlur={() => setEditingCell(null)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              setEditingCell(null);
-            }
-          }}
-          className="min-h-[2rem]"
-          autoFocus
-        />
-      );
-    }
-
-    return (
-      <Input
-        type={column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : 'text'}
-        value={currentValue}
-        onChange={(e) => updateItemValue(item.id, column.id, e.target.value)}
-        onBlur={() => setEditingCell(null)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            setEditingCell(null);
-          }
-        }}
-        className="border-blue-500"
-        autoFocus
-      />
-    );
   };
 
   if (loading) {
@@ -330,8 +285,10 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 <option value="text">Text</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
-                <option value="checkbox">Checkbox</option>
+                <option value="status">Status</option>
                 <option value="textarea">Textarea</option>
+                <option value="file">File</option>
+                <option value="timestamp">Timestamp</option>
               </select>
               <Button onClick={addNewColumn} size="sm">
                 <Plus className="w-4 h-4" />
@@ -346,7 +303,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="font-semibold">Item Name</TableHead>
                 {columns.map((column) => (
                   <TableHead key={column.id} className="font-semibold min-w-[150px]">
                     {column.name}
@@ -358,16 +314,27 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  {columns.map((column) => (
-                    <TableCell key={`${item.id}-${column.id}`} className="p-0">
-                      {renderCellInput(item, column)}
-                    </TableCell>
-                  ))}
+                  {columns.map((column) => {
+                    const cellKey = `${item.id}-${column.id}`;
+                    const currentValue = getItemValue(item.id, column.id);
+                    
+                    return (
+                      <TableCell key={cellKey} className="p-0">
+                        <CellEditor
+                          column={column}
+                          value={currentValue}
+                          onValueChange={(value) => updateItemValue(item.id, column.id, value)}
+                          onBlur={() => setEditingCell(null)}
+                          isEditing={editingCell === cellKey}
+                          onClick={() => setEditingCell(cellKey)}
+                        />
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
               <TableRow>
-                <TableCell colSpan={columns.length + 1}>
+                <TableCell colSpan={columns.length}>
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder="New item name"
@@ -394,7 +361,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
         {items.length === 0 && columns.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            <p>No columns or items yet. Add a column to get started!</p>
+            <p>No columns or items yet. Create a new board to see the default columns!</p>
           </div>
         )}
       </CardContent>

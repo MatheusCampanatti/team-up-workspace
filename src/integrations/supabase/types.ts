@@ -14,7 +14,9 @@ export type Database = {
           board_id: string
           created_at: string | null
           id: string
+          is_readonly: boolean | null
           name: string
+          options: Json | null
           order: number | null
           type: string
         }
@@ -22,7 +24,9 @@ export type Database = {
           board_id: string
           created_at?: string | null
           id?: string
+          is_readonly?: boolean | null
           name: string
+          options?: Json | null
           order?: number | null
           type?: string
         }
@@ -30,7 +34,9 @@ export type Database = {
           board_id?: string
           created_at?: string | null
           id?: string
+          is_readonly?: boolean | null
           name?: string
+          options?: Json | null
           order?: number | null
           type?: string
         }
@@ -150,23 +156,32 @@ export type Database = {
       }
       item_values: {
         Row: {
+          boolean_value: boolean | null
           column_id: string | null
+          date_value: string | null
           id: string
           item_id: string | null
+          number_value: number | null
           updated_at: string | null
           value: string | null
         }
         Insert: {
+          boolean_value?: boolean | null
           column_id?: string | null
+          date_value?: string | null
           id?: string
           item_id?: string | null
+          number_value?: number | null
           updated_at?: string | null
           value?: string | null
         }
         Update: {
+          boolean_value?: boolean | null
           column_id?: string | null
+          date_value?: string | null
           id?: string
           item_id?: string | null
+          number_value?: number | null
           updated_at?: string | null
           value?: string | null
         }
@@ -280,6 +295,10 @@ export type Database = {
       check_user_is_admin: {
         Args: { _user_id: string; _company_id: string }
         Returns: boolean
+      }
+      create_default_board_columns: {
+        Args: { board_id_param: string }
+        Returns: undefined
       }
     }
     Enums: {
