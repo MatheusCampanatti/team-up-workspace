@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +13,7 @@ interface Column {
   name: string;
   type: string;
   board_id: string;
+  order: number | null;
   created_at: string;
 }
 
@@ -21,6 +21,7 @@ interface Item {
   id: string;
   name: string;
   board_id: string;
+  order: number | null;
   created_at: string;
 }
 
@@ -55,24 +56,24 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     console.log('Fetching board data for boardId:', boardId);
 
     try {
-      // Fetch columns
+      // Fetch columns from board_columns table
       const { data: columnsData, error: columnsError } = await supabase
-        .from('columns')
+        .from('board_columns')
         .select('*')
         .eq('board_id', boardId)
-        .order('created_at');
+        .order('order', { ascending: true, nullsFirst: false });
 
       if (columnsError) {
         console.error('Error fetching columns:', columnsError);
         return;
       }
 
-      // Fetch items
+      // Fetch items from board_items table
       const { data: itemsData, error: itemsError } = await supabase
-        .from('items')
+        .from('board_items')
         .select('*')
         .eq('board_id', boardId)
-        .order('created_at');
+        .order('order', { ascending: true, nullsFirst: false });
 
       if (itemsError) {
         console.error('Error fetching items:', itemsError);
@@ -159,9 +160,15 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     console.log('Adding new item:', newItemName);
 
     try {
+      const nextOrder = items.length > 0 ? Math.max(...items.map(item => item.order || 0)) + 1 : 1;
+
       const { data, error } = await supabase
-        .from('items')
-        .insert([{ name: newItemName, board_id: boardId }])
+        .from('board_items')
+        .insert([{ 
+          name: newItemName, 
+          board_id: boardId,
+          order: nextOrder
+        }])
         .select();
 
       if (error) {
@@ -184,9 +191,16 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     console.log('Adding new column:', { name: newColumnName, type: newColumnType });
 
     try {
+      const nextOrder = columns.length > 0 ? Math.max(...columns.map(col => col.order || 0)) + 1 : 1;
+
       const { data, error } = await supabase
-        .from('columns')
-        .insert([{ name: newColumnName, type: newColumnType, board_id: boardId }])
+        .from('board_columns')
+        .insert([{ 
+          name: newColumnName, 
+          type: newColumnType, 
+          board_id: boardId,
+          order: nextOrder
+        }])
         .select();
 
       if (error) {

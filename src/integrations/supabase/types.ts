@@ -9,6 +9,57 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      board_columns: {
+        Row: {
+          board_id: string
+          created_at: string | null
+          id: string
+          name: string
+          order: number | null
+          type: string
+        }
+        Insert: {
+          board_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+          order?: number | null
+          type?: string
+        }
+        Update: {
+          board_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          order?: number | null
+          type?: string
+        }
+        Relationships: []
+      }
+      board_items: {
+        Row: {
+          board_id: string
+          created_at: string | null
+          id: string
+          name: string
+          order: number | null
+        }
+        Insert: {
+          board_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+          order?: number | null
+        }
+        Update: {
+          board_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          order?: number | null
+        }
+        Relationships: []
+      }
       boards: {
         Row: {
           company_id: string
