@@ -93,7 +93,14 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       console.log('Fetched data:', { columnsData, itemsData, valuesData });
-      setColumns(columnsData || []);
+      
+      // Transform columns data to match our interface
+      const transformedColumns: Column[] = (columnsData || []).map(col => ({
+        ...col,
+        options: Array.isArray(col.options) ? col.options as string[] : null
+      }));
+      
+      setColumns(transformedColumns);
       setItems(itemsData || []);
       setItemValues(valuesData || []);
     } catch (error) {
@@ -238,7 +245,13 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       if (data) {
-        setColumns(prev => [...prev, ...data]);
+        // Transform the new column data to match our interface
+        const transformedNewColumns: Column[] = data.map(col => ({
+          ...col,
+          options: Array.isArray(col.options) ? col.options as string[] : null
+        }));
+        
+        setColumns(prev => [...prev, ...transformedNewColumns]);
         setNewColumnName('');
         setNewColumnType('text');
       }
