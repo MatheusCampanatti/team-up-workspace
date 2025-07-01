@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +31,8 @@ interface ItemValue {
   item_id: string;
   column_id: string;
   value: string;
+  date_value: string | null;
+  number_value: number | null;
   updated_at: string;
 }
 
@@ -110,25 +111,68 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     }
   };
 
-  const getItemValue = (itemId: string, columnId: string): string => {
+  const getItemValue = (itemId: string, columnId: string, column: Column): any => {
     const itemValue = itemValues.find(
       (value) => value.item_id === itemId && value.column_id === columnId
     );
-    return itemValue?.value || '';
+    
+    if (!itemValue) return '';
+    
+    // Return appropriate value based on column type
+    switch (column.type) {
+      case 'date':
+        return itemValue.date_value || '';
+      case 'number':
+        return itemValue.number_value || '';
+      case 'date-range':
+        try {
+          return itemValue.value ? JSON.parse(itemValue.value) : { start: '', end: '' };
+        } catch {
+          return { start: '', end: '' };
+        }
+      default:
+        return itemValue.value || '';
+    }
   };
 
-  const updateItemValue = async (itemId: string, columnId: string, value: string) => {
-    console.log('Updating item value:', { itemId, columnId, value });
+  const updateItemValue = async (itemId: string, columnId: string, value: any, column: Column) => {
+    console.log('Updating item value:', { itemId, columnId, value, columnType: column.type });
 
     try {
       const existingValue = itemValues.find(
         (val) => val.item_id === itemId && val.column_id === columnId
       );
 
+      // Prepare update data based on column type
+      let updateData: any = { updated_at: new Date().toISOString() };
+      
+      switch (column.type) {
+        case 'date':
+          updateData.date_value = value || null;
+          updateData.value = null;
+          updateData.number_value = null;
+          break;
+        case 'number':
+          updateData.number_value = value ? parseFloat(value) : null;
+          updateData.value = null;
+          updateData.date_value = null;
+          break;
+        case 'date-range':
+          updateData.value = JSON.stringify(value);
+          updateData.date_value = null;
+          updateData.number_value = null;
+          break;
+        default:
+          updateData.value = value;
+          updateData.date_value = null;
+          updateData.number_value = null;
+          break;
+      }
+
       if (existingValue) {
         const { error } = await supabase
           .from('item_values')
-          .update({ value, updated_at: new Date().toISOString() })
+          .update(updateData)
           .eq('id', existingValue.id);
 
         if (error) {
@@ -139,14 +183,20 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         setItemValues(prev =>
           prev.map(val =>
             val.id === existingValue.id
-              ? { ...val, value, updated_at: new Date().toISOString() }
+              ? { ...val, ...updateData }
               : val
           )
         );
       } else {
+        const insertData = {
+          item_id: itemId,
+          column_id: columnId,
+          ...updateData
+        };
+
         const { data, error } = await supabase
           .from('item_values')
-          .insert([{ item_id: itemId, column_id: columnId, value }])
+          .insert([insertData])
           .select();
 
         if (error) {
@@ -164,11 +214,33 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   };
 
   const createDefaultItemValues = async (itemId: string) => {
-    const valuesToCreate = columns.map(column => ({
-      item_id: itemId,
-      column_id: column.id,
-      value: column.type === 'timestamp' ? new Date().toISOString() : '',
-    }));
+    const valuesToCreate = columns.map(column => {
+      let insertData: any = {
+        item_id: itemId,
+        column_id: column.id,
+      };
+
+      // Set appropriate default values based on column type
+      switch (column.type) {
+        case 'timestamp':
+          insertData.value = new Date().toISOString();
+          break;
+        case 'date':
+          insertData.date_value = null;
+          break;
+        case 'number':
+          insertData.number_value = null;
+          break;
+        case 'date-range':
+          insertData.value = JSON.stringify({ start: '', end: '' });
+          break;
+        default:
+          insertData.value = '';
+          break;
+      }
+
+      return insertData;
+    });
 
     if (valuesToCreate.length > 0) {
       const { data, error } = await supabase
@@ -329,14 +401,14 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 <TableRow key={item.id}>
                   {columns.map((column) => {
                     const cellKey = `${item.id}-${column.id}`;
-                    const currentValue = getItemValue(item.id, column.id);
+                    const currentValue = getItemValue(item.id, column.id, column);
                     
                     return (
                       <TableCell key={cellKey} className="p-0">
                         <CellEditor
                           column={column}
                           value={currentValue}
-                          onValueChange={(value) => updateItemValue(item.id, column.id, value)}
+                          onValueChange={(value) => updateItemValue(item.id, column.id, value, column)}
                           onBlur={() => setEditingCell(null)}
                           isEditing={editingCell === cellKey}
                           onClick={() => setEditingCell(cellKey)}

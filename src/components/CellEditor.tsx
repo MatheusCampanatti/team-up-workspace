@@ -2,7 +2,6 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,8 +23,8 @@ interface Column {
 
 interface CellEditorProps {
   column: Column;
-  value: string;
-  onValueChange: (value: string) => void;
+  value: any;
+  onValueChange: (value: any) => void;
   onBlur: () => void;
   isEditing: boolean;
   onClick: () => void;
@@ -62,6 +61,13 @@ const CellEditor: React.FC<CellEditorProps> = ({
       return value ? format(new Date(value), 'MMM dd, yyyy') : 'Select date';
     }
     
+    if (column.type === 'date-range') {
+      if (value && value.start && value.end) {
+        return `${format(new Date(value.start), 'MMM dd')} - ${format(new Date(value.end), 'MMM dd, yyyy')}`;
+      }
+      return 'Select date range';
+    }
+    
     if (column.type === 'number') {
       return value ? `$${parseFloat(value).toLocaleString()}` : 'Enter amount';
     }
@@ -70,14 +76,18 @@ const CellEditor: React.FC<CellEditorProps> = ({
       return value ? format(new Date(value), 'MMM dd, yyyy HH:mm') : format(new Date(), 'MMM dd, yyyy HH:mm');
     }
     
+    if (column.type === 'file') {
+      return value ? value : 'Upload file';
+    }
+    
     return value || 'Click to edit';
   };
 
-  if (!isEditing) {
+  if (!isEditing || column.is_readonly || column.type === 'timestamp') {
     return (
       <div
         className="min-h-[2rem] p-2 cursor-pointer hover:bg-gray-50 rounded border-transparent border w-full"
-        onClick={column.is_readonly ? undefined : onClick}
+        onClick={column.is_readonly || column.type === 'timestamp' ? undefined : onClick}
       >
         {renderDisplayValue()}
       </div>
@@ -86,7 +96,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
 
   if (column.type === 'status' && column.options) {
     return (
-      <Select value={value} onValueChange={onValueChange} onOpenChange={(open) => !open && onBlur()}>
+      <Select value={value || ''} onValueChange={onValueChange} onOpenChange={(open) => !open && onBlur()}>
         <SelectTrigger className="border-blue-500">
           <SelectValue placeholder="Select status" />
         </SelectTrigger>
@@ -134,10 +144,36 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
+  if (column.type === 'date-range') {
+    const dateRange = value || { start: '', end: '' };
+    
+    return (
+      <div className="flex gap-2 items-center">
+        <Input
+          type="date"
+          value={dateRange.start}
+          onChange={(e) => onValueChange({ ...dateRange, start: e.target.value })}
+          onBlur={onBlur}
+          className="border-blue-500 text-xs"
+          placeholder="Start"
+        />
+        <span className="text-gray-400">to</span>
+        <Input
+          type="date"
+          value={dateRange.end}
+          onChange={(e) => onValueChange({ ...dateRange, end: e.target.value })}
+          onBlur={onBlur}
+          className="border-blue-500 text-xs"
+          placeholder="End"
+        />
+      </div>
+    );
+  }
+
   if (column.type === 'textarea') {
     return (
       <Textarea
-        value={value}
+        value={value || ''}
         onChange={(e) => onValueChange(e.target.value)}
         onBlur={onBlur}
         onKeyDown={(e) => {
@@ -156,7 +192,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     return (
       <Input
         type="number"
-        value={value}
+        value={value || ''}
         onChange={(e) => onValueChange(e.target.value)}
         onBlur={onBlur}
         onKeyDown={(e) => {
@@ -176,7 +212,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     return (
       <Input
         type="text"
-        value={value}
+        value={value || ''}
         onChange={(e) => onValueChange(e.target.value)}
         onBlur={onBlur}
         onKeyDown={(e) => {
@@ -195,7 +231,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
   return (
     <Input
       type="text"
-      value={value}
+      value={value || ''}
       onChange={(e) => onValueChange(e.target.value)}
       onBlur={onBlur}
       onKeyDown={(e) => {
