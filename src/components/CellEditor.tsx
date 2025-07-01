@@ -39,7 +39,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
   onClick,
 }) => {
   const renderDisplayValue = () => {
-    if (column.type === 'status' && column.options) {
+    if ((column.type === 'status' || column.type === 'priority') && column.options) {
       const statusColors: { [key: string]: string } = {
         'Not started': 'bg-gray-100 text-gray-800',
         'Working on it': 'bg-yellow-100 text-yellow-800',
@@ -52,7 +52,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
       
       return (
         <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusColors[value] || 'bg-gray-100 text-gray-800')}>
-          {value || 'Select status'}
+          {value || 'Select option'}
         </span>
       );
     }
@@ -72,7 +72,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
       return value ? `$${parseFloat(value).toLocaleString()}` : 'Enter amount';
     }
     
-    if (column.type === 'timestamp') {
+    if (column.type === 'timestamp' || column.type === 'last updated') {
       return value ? format(new Date(value), 'MMM dd, yyyy HH:mm') : format(new Date(), 'MMM dd, yyyy HH:mm');
     }
     
@@ -83,22 +83,26 @@ const CellEditor: React.FC<CellEditorProps> = ({
     return value || 'Click to edit';
   };
 
-  if (!isEditing || column.is_readonly || column.type === 'timestamp') {
+  // Check if column is readonly
+  const isReadonly = column.is_readonly || column.type === 'timestamp' || column.type === 'last updated';
+
+  if (!isEditing || isReadonly) {
     return (
       <div
         className="min-h-[2rem] p-2 cursor-pointer hover:bg-gray-50 rounded border-transparent border w-full"
-        onClick={column.is_readonly || column.type === 'timestamp' ? undefined : onClick}
+        onClick={isReadonly ? undefined : onClick}
       >
         {renderDisplayValue()}
       </div>
     );
   }
 
-  if (column.type === 'status' && column.options) {
+  // Status and Priority dropdowns
+  if ((column.type === 'status' || column.type === 'priority') && column.options) {
     return (
       <Select value={value || ''} onValueChange={onValueChange} onOpenChange={(open) => !open && onBlur()}>
         <SelectTrigger className="border-blue-500">
-          <SelectValue placeholder="Select status" />
+          <SelectValue placeholder="Select option" />
         </SelectTrigger>
         <SelectContent>
           {column.options.map((option) => (
@@ -111,6 +115,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
+  // Date picker
   if (column.type === 'date') {
     const dateValue = value ? new Date(value) : undefined;
     
@@ -144,6 +149,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
+  // Date range picker
   if (column.type === 'date-range') {
     const dateRange = value || { start: '', end: '' };
     
@@ -170,7 +176,8 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
-  if (column.type === 'textarea') {
+  // Notes textarea
+  if (column.type === 'notes') {
     return (
       <Textarea
         value={value || ''}
@@ -188,6 +195,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
+  // Number input
   if (column.type === 'number') {
     return (
       <Input
@@ -208,6 +216,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
+  // File input
   if (column.type === 'file') {
     return (
       <Input
@@ -228,6 +237,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
+  // Default text input
   return (
     <Input
       type="text"

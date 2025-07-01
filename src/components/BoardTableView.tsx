@@ -121,6 +121,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     // Return appropriate value based on column type
     switch (column.type) {
       case 'date':
+      case 'timestamp':
         return itemValue.date_value || '';
       case 'number':
         return itemValue.number_value || '';
@@ -139,75 +140,60 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     console.log('Updating item value:', { itemId, columnId, value, columnType: column.type });
 
     try {
-      const existingValue = itemValues.find(
-        (val) => val.item_id === itemId && val.column_id === columnId
-      );
-
-      // Prepare update data based on column type
-      let updateData: any = { updated_at: new Date().toISOString() };
+      // Prepare upsert data based on column type
+      let upsertData: any = {
+        item_id: itemId,
+        column_id: columnId,
+        updated_at: new Date().toISOString()
+      };
       
+      // Set the appropriate value field based on column type
       switch (column.type) {
         case 'date':
-          updateData.date_value = value || null;
-          updateData.value = null;
-          updateData.number_value = null;
+        case 'timestamp':
+          upsertData.date_value = value || null;
+          upsertData.value = null;
+          upsertData.number_value = null;
           break;
         case 'number':
-          updateData.number_value = value ? parseFloat(value) : null;
-          updateData.value = null;
-          updateData.date_value = null;
+          upsertData.number_value = value ? parseFloat(value) : null;
+          upsertData.value = null;
+          upsertData.date_value = null;
           break;
         case 'date-range':
-          updateData.value = JSON.stringify(value);
-          updateData.date_value = null;
-          updateData.number_value = null;
+          upsertData.value = JSON.stringify(value);
+          upsertData.date_value = null;
+          upsertData.number_value = null;
           break;
+        case 'text':
+        case 'status':
+        case 'priority':
+        case 'notes':
+        case 'file':
         default:
-          updateData.value = value;
-          updateData.date_value = null;
-          updateData.number_value = null;
+          upsertData.value = value;
+          upsertData.date_value = null;
+          upsertData.number_value = null;
           break;
       }
 
-      if (existingValue) {
-        const { error } = await supabase
-          .from('item_values')
-          .update(updateData)
-          .eq('id', existingValue.id);
+      // Use upsert with conflict resolution
+      const { data, error } = await supabase
+        .from('item_values')
+        .upsert(upsertData, {
+          onConflict: 'item_id,column_id'
+        })
+        .select();
 
-        if (error) {
-          console.error('Error updating item value:', error);
-          return;
-        }
-
-        setItemValues(prev =>
-          prev.map(val =>
-            val.id === existingValue.id
-              ? { ...val, ...updateData }
-              : val
-          )
-        );
-      } else {
-        const insertData = {
-          item_id: itemId,
-          column_id: columnId,
-          ...updateData
-        };
-
-        const { data, error } = await supabase
-          .from('item_values')
-          .insert([insertData])
-          .select();
-
-        if (error) {
-          console.error('Error creating item value:', error);
-          return;
-        }
-
-        if (data) {
-          setItemValues(prev => [...prev, ...data]);
-        }
+      if (error) {
+        console.error('Error upserting item value:', error);
+        return;
       }
+
+      console.log('Successfully updated item value:', data);
+      
+      // Refresh the data to show changes
+      await fetchBoardData();
     } catch (error) {
       console.error('Unexpected error updating item value:', error);
     }
@@ -223,7 +209,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       // Set appropriate default values based on column type
       switch (column.type) {
         case 'timestamp':
-          insertData.value = new Date().toISOString();
+        case 'last updated':
+          insertData.date_value = new Date().toISOString().split('T')[0];
           break;
         case 'date':
           insertData.date_value = null;
@@ -368,10 +355,11 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 className="px-3 py-2 border rounded-md text-sm"
               >
                 <option value="text">Text</option>
+                <option value="status">Status</option>
+                <option value="priority">Priority</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
-                <option value="status">Status</option>
-                <option value="textarea">Textarea</option>
+                <option value="notes">Notes</option>
                 <option value="file">File</option>
                 <option value="timestamp">Timestamp</option>
               </select>

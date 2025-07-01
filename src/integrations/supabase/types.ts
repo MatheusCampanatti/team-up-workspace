@@ -293,7 +293,7 @@ export type Database = {
     }
     Functions: {
       check_user_is_admin: {
-        Args: { _user_id: string; _company_id: string }
+        Args: { _user_id: string; _company_id: string } | { company_id: string }
         Returns: boolean
       }
       create_default_board_columns: {
