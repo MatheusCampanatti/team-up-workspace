@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { sendInviteEmail } from '@/libs/email';
 
 interface CompanyInviteFormProps {
   companyId: string;
@@ -29,17 +27,33 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
     try {
       const token = uuidv4();
 
-      const { error } = await supabase
+      // First, insert the invitation into the database
+      const { error: dbError } = await supabase
         .from('company_invitations')
         .insert([{ email, company_id: companyId, role, status: 'pending', token }]);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
-      const sent = await sendInviteEmail(email, token);
-      if (!sent) {
+      // Then, call the Edge Function to send the email
+      const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send_invitation_email', {
+        body: { email, token }
+      });
+
+      if (emailError) {
+        console.error('Email function error:', emailError);
         toast({ 
           title: 'Warning', 
-          description: 'Invitation saved but email not sent', 
+          description: 'Invitation saved but email could not be sent', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      if (!emailResponse?.success) {
+        console.error('Email sending failed:', emailResponse);
+        toast({ 
+          title: 'Warning', 
+          description: 'Invitation saved but email could not be sent', 
           variant: 'destructive' 
         });
         return;
@@ -57,7 +71,7 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
         onInvitationSent();
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Error sending invitation:', err);
       toast({ 
         title: 'Error', 
         description: 'Failed to send invitation', 
