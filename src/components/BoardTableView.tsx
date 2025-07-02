@@ -177,23 +177,25 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           break;
       }
 
-      // Use upsert with conflict resolution
+          // Use upsert with conflict resolution
       const { data, error } = await supabase
         .from('item_values')
-        .upsert(upsertData, {
-          onConflict: 'item_id,column_id'
-        })
+        .upsert(upsertData, { onConflict: ['item_id', 'column_id'] })
         .select();
 
       if (error) {
-        console.error('Error upserting item value:', error);
+        console.error('Error updating item value:', error);
         return;
       }
 
-      console.log('Successfully updated item value:', data);
-      
-      // Refresh the data to show changes
-      await fetchBoardData();
+      if (data && data[0]) {
+        setItemValues((prev) => {
+          const rest = prev.filter(
+            (v) => !(v.item_id === itemId && v.column_id === columnId)
+          );
+          return [...rest, data[0]];
+        });
+      }
     } catch (error) {
       console.error('Unexpected error updating item value:', error);
     }
