@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Edit } from 'lucide-react';
+import { useRealtimeItemValues } from '@/hooks/useRealtimeItemValues';
 
 interface Column {
   id: string;
@@ -102,6 +102,51 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     }
   };
 
+  // Handle realtime changes
+  const handleRealtimeChange = useCallback((payload: any) => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+    
+    // Filter out changes that don't belong to our board
+    const itemValue = newRecord || oldRecord;
+    if (!itemValue) return;
+    
+    // Check if this item value belongs to our board's items
+    const belongsToBoard = items.some(item => item.id === itemValue.item_id);
+    if (!belongsToBoard) return;
+
+    console.log('Processing realtime change for our board:', { eventType, itemValue });
+
+    setItemValues(prevValues => {
+      switch (eventType) {
+        case 'INSERT':
+          // Add new item value if it doesn't exist
+          if (!prevValues.find(v => v.id === newRecord.id)) {
+            return [...prevValues, newRecord];
+          }
+          return prevValues;
+
+        case 'UPDATE':
+          // Update existing item value
+          return prevValues.map(value =>
+            value.id === newRecord.id ? { ...value, ...newRecord } : value
+          );
+
+        case 'DELETE':
+          // Remove deleted item value
+          return prevValues.filter(value => value.id !== oldRecord.id);
+
+        default:
+          return prevValues;
+      }
+    });
+  }, [items]);
+
+  // Set up realtime subscription
+  useRealtimeItemValues({
+    boardId,
+    onItemValueChange: handleRealtimeChange
+  });
+
   const getItemValue = (itemId: string, columnId: string): string => {
     const itemValue = itemValues.find(
       (value) => value.item_id === itemId && value.column_id === columnId
@@ -111,6 +156,29 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
   const updateItemValue = async (itemId: string, columnId: string, value: string) => {
     console.log('Updating item value:', { itemId, columnId, value });
+
+    // Optimistic update - update local state immediately
+    setItemValues(prev => {
+      const existingValue = prev.find(val => val.item_id === itemId && val.column_id === columnId);
+      
+      if (existingValue) {
+        return prev.map(val =>
+          val.item_id === itemId && val.column_id === columnId
+            ? { ...val, value, updated_at: new Date().toISOString() }
+            : val
+        );
+      } else {
+        // Create temporary local entry while waiting for server response
+        const tempValue: ItemValue = {
+          id: `temp-${Date.now()}`,
+          item_id: itemId,
+          column_id: columnId,
+          value,
+          updated_at: new Date().toISOString()
+        };
+        return [...prev, tempValue];
+      }
+    });
 
     try {
       const existingValue = itemValues.find(
@@ -125,16 +193,16 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
         if (error) {
           console.error('Error updating item value:', error);
+          // Revert optimistic update on error
+          setItemValues(prev => 
+            prev.map(val =>
+              val.item_id === itemId && val.column_id === columnId
+                ? { ...val, value: existingValue.value }
+                : val
+            )
+          );
           return;
         }
-
-        setItemValues(prev =>
-          prev.map(val =>
-            val.id === existingValue.id
-              ? { ...val, value, updated_at: new Date().toISOString() }
-              : val
-          )
-        );
       } else {
         const { data, error } = await supabase
           .from('item_values')
@@ -143,11 +211,22 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
         if (error) {
           console.error('Error creating item value:', error);
+          // Remove temporary entry on error
+          setItemValues(prev => 
+            prev.filter(val => !(val.item_id === itemId && val.column_id === columnId && val.id.startsWith('temp-')))
+          );
           return;
         }
 
-        if (data) {
-          setItemValues(prev => [...prev, ...data]);
+        if (data && data.length > 0) {
+          // Replace temporary entry with real one
+          setItemValues(prev => 
+            prev.map(val => 
+              val.item_id === itemId && val.column_id === columnId && val.id.startsWith('temp-')
+                ? data[0]
+                : val
+            )
+          );
         }
       }
     } catch (error) {

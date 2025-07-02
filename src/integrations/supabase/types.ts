@@ -138,6 +138,44 @@ export type Database = {
         }
         Relationships: []
       }
+      company_invitations: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          email: string
+          id: string
+          role: string
+          status: string
+          token: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          email: string
+          id?: string
+          role?: string
+          status?: string
+          token: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          role?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_values: {
         Row: {
           boolean_value: boolean | null
@@ -247,6 +285,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_company_invitation: {
+        Args: { invitation_token: string }
+        Returns: Json
+      }
       check_user_is_admin: {
         Args: { _user_id: string; _company_id: string } | { company_id: string }
         Returns: boolean

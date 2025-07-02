@@ -1,115 +1,132 @@
 
 import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { UserCheck, Key } from 'lucide-react';
 
 const AcceptInvitation = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [token, setToken] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAcceptInvitation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !token.trim()) return;
+  const token = searchParams.get('token');
 
-    setIsLoading(true);
-    console.log('Accepting invitation with token:', token);
+  const handleAcceptInvitation = async () => {
+    if (!token) {
+      setError('Invalid invitation token');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
 
     try {
-      const { data, error } = await supabase.rpc('accept_company_invitation', {
-        invitation_token: token.trim()
-      });
+      const { data, error: functionError } = await supabase.rpc(
+        'accept_company_invitation',
+        { invitation_token: token }
+      );
 
-      if (error) {
-        console.error('Error accepting invitation:', error);
-        throw error;
+      if (functionError) {
+        console.error('Error accepting invitation:', functionError);
+        setError('Failed to accept invitation');
+        return;
       }
 
-      console.log('Accept invitation response:', data);
-
-      if (data && data.success) {
-        toast({
-          title: 'Invitation accepted!',
-          description: 'You have successfully joined the company.'
-        });
-        
-        // Redirect to the company's boards page
-        navigate(`/company/${data.company_id}/boards`);
+      if (data && typeof data === 'object' && 'success' in data) {
+        if (data.success) {
+          setAccepted(true);
+          toast({
+            title: 'Invitation accepted!',
+            description: 'You have successfully joined the company.',
+          });
+          
+          setTimeout(() => {
+            navigate(`/company/${data.company_id}/boards`);
+          }, 2000);
+        } else {
+          setError(data.error || 'Failed to accept invitation');
+        }
       } else {
-        throw new Error(data?.error || 'Failed to accept invitation');
+        setError('Unexpected response from server');
       }
-    } catch (error: any) {
-      console.error('Error in handleAcceptInvitation:', error);
-      toast({
-        title: 'Error accepting invitation',
-        description: error.message,
-        variant: 'destructive'
-      });
+    } catch (error) {
+      console.error('Unexpected error accepting invitation:', error);
+      setError('An unexpected error occurred');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  if (!user) {
+  if (!token) {
     return (
-      <Card className="max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle>Sign In Required</CardTitle>
-          <CardDescription>
-            You need to sign in to accept an invitation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => navigate('/auth')} className="w-full">
-            Sign In
-          </Button>
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-8">
+          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Invalid Invitation</h2>
+          <p className="text-gray-600 text-center">
+            This invitation link is invalid or has expired.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (accepted) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-8">
+          <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Invitation Accepted!</h2>
+          <p className="text-gray-600 text-center mb-4">
+            You have successfully joined the company. Redirecting to the dashboard...
+          </p>
+          <div className="flex items-center">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <span className="text-sm text-gray-500">Redirecting...</span>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="max-w-md mx-auto">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <UserCheck className="h-5 w-5 mr-2" />
-          Accept Invitation
-        </CardTitle>
+        <CardTitle>Accept Company Invitation</CardTitle>
         <CardDescription>
-          Enter your invitation token to join a company
+          You have been invited to join a company. Click the button below to accept the invitation.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleAcceptInvitation} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="token">Invitation Token</Label>
-            <div className="relative">
-              <Key className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                id="token"
-                type="text"
-                placeholder="Enter invitation token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="pl-10"
-                required
-              />
+        <div className="space-y-4">
+          {error && (
+            <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-md">
+              <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
+              <span className="text-red-700 text-sm">{error}</span>
             </div>
-          </div>
-
-          <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? 'Accepting...' : 'Accept Invitation'}
+          )}
+          
+          <Button 
+            onClick={handleAcceptInvitation} 
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Accepting...
+              </>
+            ) : (
+              'Accept Invitation'
+            )}
           </Button>
-        </form>
+        </div>
       </CardContent>
     </Card>
   );
