@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Edit } from 'lucide-react';
 import { useRealtimeItemValues } from '@/hooks/useRealtimeItemValues';
+import BoardFilters from './BoardFilters';
 
 interface Column {
   id: string;
@@ -48,9 +49,88 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState('text');
 
+  // Filter states
+  const [nameFilter, setNameFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+
   useEffect(() => {
     fetchBoardData();
   }, [boardId]);
+
+  // Get unique values for filter dropdowns
+  const filterOptions = useMemo(() => {
+    const statusColumn = columns.find(col => 
+      col.type === 'status' && col.name.toLowerCase().includes('status')
+    );
+    const priorityColumn = columns.find(col => 
+      col.type === 'status' && col.name.toLowerCase().includes('priority')
+    );
+
+    const statusValues = new Set<string>();
+    const priorityValues = new Set<string>();
+
+    if (statusColumn) {
+      itemValues
+        .filter(iv => iv.column_id === statusColumn.id && iv.value)
+        .forEach(iv => statusValues.add(iv.value));
+    }
+
+    if (priorityColumn) {
+      itemValues
+        .filter(iv => iv.column_id === priorityColumn.id && iv.value)
+        .forEach(iv => priorityValues.add(iv.value));
+    }
+
+    return {
+      statusOptions: Array.from(statusValues).sort(),
+      priorityOptions: Array.from(priorityValues).sort(),
+    };
+  }, [columns, itemValues]);
+
+  // Filter items based on current filters
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      // Name filter
+      if (nameFilter && !item.name.toLowerCase().includes(nameFilter.toLowerCase())) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter) {
+        const statusColumn = columns.find(col => 
+          col.type === 'status' && col.name.toLowerCase().includes('status')
+        );
+        if (statusColumn) {
+          const statusValue = getItemValue(item.id, statusColumn.id);
+          if (statusValue !== statusFilter) {
+            return false;
+          }
+        }
+      }
+
+      // Priority filter
+      if (priorityFilter) {
+        const priorityColumn = columns.find(col => 
+          col.type === 'status' && col.name.toLowerCase().includes('priority')
+        );
+        if (priorityColumn) {
+          const priorityValue = getItemValue(item.id, priorityColumn.id);
+          if (priorityValue !== priorityFilter) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+  }, [items, nameFilter, statusFilter, priorityFilter, columns, itemValues]);
+
+  const clearFilters = () => {
+    setNameFilter('');
+    setStatusFilter('');
+    setPriorityFilter('');
+  };
 
   const fetchBoardData = async () => {
     setLoading(true);
@@ -511,97 +591,117 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Board Table
-          <div className="flex gap-2">
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Column name"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                className="w-32"
-              />
-              <select
-                value={newColumnType}
-                onChange={(e) => setNewColumnType(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm"
-              >
-                <option value="text">Text</option>
-                <option value="number">Number</option>
-                <option value="date">Date</option>
-                <option value="checkbox">Checkbox</option>
-                <option value="textarea">Textarea</option>
-                <option value="status">Status</option>
-                <option value="timestamp">Timestamp</option>
-              </select>
-              <Button onClick={addNewColumn} size="sm">
-                <Plus className="w-4 h-4" />
-                Column
-              </Button>
+    <div className="w-full space-y-6">
+      <BoardFilters
+        nameFilter={nameFilter}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        onNameFilterChange={setNameFilter}
+        onStatusFilterChange={setStatusFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        onClearFilters={clearFilters}
+        statusOptions={filterOptions.statusOptions}
+        priorityOptions={filterOptions.priorityOptions}
+      />
+
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Board Table
+            <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Column name"
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  className="w-32"
+                />
+                <select
+                  value={newColumnType}
+                  onChange={(e) => setNewColumnType(e.target.value)}
+                  className="px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="checkbox">Checkbox</option>
+                  <option value="textarea">Textarea</option>
+                  <option value="status">Status</option>
+                  <option value="timestamp">Timestamp</option>
+                </select>
+                <Button onClick={addNewColumn} size="sm">
+                  <Plus className="w-4 h-4" />
+                  Column
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-semibold">Item Name</TableHead>
-                {columns.map((column) => (
-                  <TableHead key={column.id} className="font-semibold min-w-[150px]">
-                    {column.name}
-                    <span className="text-xs text-gray-500 ml-1">({column.type})</span>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="font-semibold">Item Name</TableHead>
                   {columns.map((column) => (
-                    <TableCell key={`${item.id}-${column.id}`} className="p-0">
-                      {renderCellInput(item, column)}
-                    </TableCell>
+                    <TableHead key={column.id} className="font-semibold min-w-[150px]">
+                      {column.name}
+                      <span className="text-xs text-gray-500 ml-1">({column.type})</span>
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-              <TableRow>
-                <TableCell colSpan={columns.length + 1}>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="New item name"
-                      value={newItemName}
-                      onChange={(e) => setNewItemName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addNewItem();
-                        }
-                      }}
-                      className="flex-1"
-                    />
-                    <Button onClick={addNewItem} size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Item
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-
-        {items.length === 0 && columns.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <p>No columns or items yet. Add a column to get started!</p>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    {columns.map((column) => (
+                      <TableCell key={`${item.id}-${column.id}`} className="p-0">
+                        {renderCellInput(item, column)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={columns.length + 1}>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="New item name"
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addNewItem();
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button onClick={addNewItem} size="sm">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Item
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {filteredItems.length === 0 && items.length > 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>No items match the current filters.</p>
+            </div>
+          )}
+
+          {items.length === 0 && columns.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>No columns or items yet. Add a column to get started!</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

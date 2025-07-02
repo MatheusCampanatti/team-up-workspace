@@ -18,70 +18,54 @@ const AcceptInvitation = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const [loading, setLoading] = useState(false);
-  const [accepted, setAccepted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [accepted, setAccepted] = useState(false);
 
   const token = searchParams.get("token");
 
-  /** ───────────────────────────────────────────────────────────────
-   * 1. Verifica se o usuário está logado; se não, redireciona p/ login
-   *    (mantém query string para voltar após login)
-   * ─────────────────────────────────────────────────────────────── */
   useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        navigate(
-          `/auth?redirectTo=/accept${token ? `?token=${token}` : ""}`,
-          { replace: true }
-        );
-      } else {
-        setCheckingAuth(false);
-      }
-    };
-    checkAuth();
-  }, [navigate, token]);
-
-  /** ───────────────────────────────────────────────────────────────
-   * 2. Aceitar convite (RPC)
-   * ─────────────────────────────────────────────────────────────── */
-  const handleAcceptInvitation = async () => {
     if (!token) {
-      setError("Invalid invitation token");
-      console.error("Invitation token missing in URL.");
+      setError("Invalid invitation link");
+      setLoading(false);
       return;
     }
 
-    console.log("🟢 Accepting invitation with token:", token);
-    setLoading(true);
-    setError(null);
+    acceptInvitation(token);
+  }, [token]);
 
+  const acceptInvitation = async (invitationToken: string) => {
     try {
-      const { data, error: functionError } = await supabase.rpc(
-        "accept_company_invitation",
-        { invitation_token: token }
-      );
+      setLoading(true);
+      setError(null);
 
-      if (functionError) {
-        console.error("Error accepting invitation (RPC):", functionError);
-        setError(functionError.message || "Failed to accept invitation");
+      console.log("Accepting invitation with token:", invitationToken);
+
+      const { data, error } = await supabase.rpc("accept_company_invitation", {
+        invitation_token: invitationToken,
+      });
+
+      if (error) {
+        console.error("Error accepting invitation:", error);
+        setError(String(error.message));
         return;
       }
 
-      // Cast the Json response to our expected type
-      const response = data as AcceptInvitationResponse;
+      console.log("Invitation response:", data);
+
+      if (!data) {
+        setError("No response from server");
+        return;
+      }
+
+      // Cast the Json response to our expected type with proper type safety
+      const response = data as unknown as AcceptInvitationResponse;
 
       if (response?.success) {
         setAccepted(true);
         toast({
           title: "Invitation accepted!",
-          description: "You have successfully joined the company.",
+          description: "Welcome to the company! Redirecting to boards...",
         });
 
         setTimeout(() => {
@@ -98,90 +82,62 @@ const AcceptInvitation = () => {
     }
   };
 
-  /** ───────────────────────────────────────────────────────────────
-   * 3. Estados de interface
-   * ─────────────────────────────────────────────────────────────── */
-  if (checkingAuth) {
+  if (loading) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin mb-3" />
-          <span className="text-sm text-muted-foreground">
-            Checking authentication…
-          </span>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Processing Invitation
+            </h2>
+            <p className="text-gray-600 text-center">
+              Please wait while we process your invitation...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  if (!token) {
+  if (error) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-8">
-          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Invalid Invitation
-          </h2>
-          <p className="text-gray-600 text-center">
-            This invitation link is invalid or has expired.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Invitation Error
+            </h2>
+            <p className="text-gray-600 text-center mb-4">{error}</p>
+            <Button onClick={() => navigate("/dashboard")} variant="outline">
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   if (accepted) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-8">
-          <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Invitation Accepted!
-          </h2>
-          <p className="text-gray-600 text-center mb-4">
-            You have successfully joined the company. Redirecting…
-          </p>
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Welcome!
+            </h2>
+            <p className="text-gray-600 text-center">
+              Your invitation has been accepted successfully. You'll be redirected to the boards page shortly.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Accept Company Invitation</CardTitle>
-        <CardDescription>
-          Click the button below to accept the invitation.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {error && (
-            <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-md">
-              <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
-              <span className="text-red-700 text-sm">{error}</span>
-            </div>
-          )}
-
-          <Button
-            onClick={handleAcceptInvitation}
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Accepting…
-              </>
-            ) : (
-              "Accept Invitation"
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return null;
 };
 
 export default AcceptInvitation;
