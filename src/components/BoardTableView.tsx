@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Plus } from 'lucide-react';
-import CellEditor from './CellEditor';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Edit } from 'lucide-react';
 
 interface Column {
   id: string;
@@ -16,8 +15,6 @@ interface Column {
   board_id: string;
   order: number | null;
   created_at: string;
-  options?: string[] | null;
-  is_readonly?: boolean | null;
 }
 
 interface Item {
@@ -32,9 +29,7 @@ interface ItemValue {
   id: string;
   item_id: string;
   column_id: string;
-  value: string | null;
-  date_value: string | null;
-  number_value: number | null;
+  value: string;
   updated_at: string;
 }
 
@@ -96,14 +91,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       console.log('Fetched data:', { columnsData, itemsData, valuesData });
-      
-      // Transform columns data to match our interface
-      const transformedColumns: Column[] = (columnsData || []).map(col => ({
-        ...col,
-        options: Array.isArray(col.options) ? col.options as string[] : null
-      }));
-      
-      setColumns(transformedColumns);
+      setColumns(columnsData || []);
       setItems(itemsData || []);
       setItemValues(valuesData || []);
     } catch (error) {
@@ -113,221 +101,56 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     }
   };
 
-  const getItemValue = (itemId: string, columnId: string, column: Column): any => {
+  const getItemValue = (itemId: string, columnId: string): string => {
     const itemValue = itemValues.find(
       (value) => value.item_id === itemId && value.column_id === columnId
     );
-    
-    if (!itemValue) return '';
-    
-    // Return appropriate value based on column type
-    switch (column.type) {
-      case 'date':
-      case 'timestamp':
-      case 'last updated':
-        return itemValue.date_value || '';
-      case 'number':
-        return itemValue.number_value !== null ? itemValue.number_value : '';
-      case 'date-range':
-        try {
-          return itemValue.value ? JSON.parse(itemValue.value) : { start: '', end: '' };
-        } catch {
-          return { start: '', end: '' };
-        }
-      default:
-        return itemValue.value || '';
-    }
+    return itemValue?.value || '';
   };
 
-  const renderCellValue = (value: any, column: Column) => {
-    if (!value && value !== 0) return <span className="text-gray-400">-</span>;
-
-    switch (column.type) {
-      case 'status':
-      case 'priority':
-        return (
-          <Badge 
-            variant={
-              value === 'Done' || value === 'High' ? 'default' :
-              value === 'Working on it' || value === 'Medium' ? 'secondary' :
-              value === 'Stuck' || value === 'Low' ? 'outline' : 'secondary'
-            }
-            className={
-              value === 'Done' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
-              value === 'Working on it' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
-              value === 'Stuck' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
-              value === 'High' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
-              value === 'Medium' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
-              value === 'Low' ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
-              ''
-            }
-          >
-            {value}
-          </Badge>
-        );
-      
-      case 'date':
-      case 'timestamp':
-      case 'last updated':
-        if (!value) return <span className="text-gray-400">-</span>;
-        try {
-          const date = new Date(value);
-          return <span className="text-sm">{date.toLocaleDateString()}</span>;
-        } catch {
-          return <span className="text-sm">{value}</span>;
-        }
-      
-      case 'date-range':
-        if (typeof value === 'object' && value.start && value.end) {
-          const startDate = new Date(value.start).toLocaleDateString();
-          const endDate = new Date(value.end).toLocaleDateString();
-          return <span className="text-sm">{startDate} - {endDate}</span>;
-        } else if (typeof value === 'object' && (value.start || value.end)) {
-          const date = value.start || value.end;
-          return <span className="text-sm">{new Date(date).toLocaleDateString()}</span>;
-        }
-        return <span className="text-gray-400">-</span>;
-      
-      case 'number':
-        return <span className="text-sm font-mono">{value}</span>;
-      
-      case 'file':
-        if (value) {
-          return (
-            <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
-              📎 {value}
-            </span>
-          );
-        }
-        return <span className="text-gray-400">No file</span>;
-      
-      case 'notes':
-        if (value && value.length > 50) {
-          return (
-            <span className="text-sm" title={value}>
-              {value.substring(0, 50)}...
-            </span>
-          );
-        }
-        return <span className="text-sm">{value || '-'}</span>;
-      
-      default:
-        return <span className="text-sm">{value || '-'}</span>;
-    }
-  };
-
-  const updateItemValue = async (itemId: string, columnId: string, value: any, column: Column) => {
-    console.log('Updating item value:', { itemId, columnId, value, columnType: column.type });
+  const updateItemValue = async (itemId: string, columnId: string, value: string) => {
+    console.log('Updating item value:', { itemId, columnId, value });
 
     try {
-      // Prepare upsert data based on column type
-      let upsertData: any = {
-        item_id: itemId,
-        column_id: columnId,
-        updated_at: new Date().toISOString(),
-        value: null,
-        date_value: null,
-        number_value: null
-      };
-      
-      // Set the appropriate value field based on column type
-      switch (column.type) {
-        case 'date':
-        case 'timestamp':
-        case 'last updated':
-          upsertData.date_value = value || null;
-          break;
-        case 'number':
-          upsertData.number_value = value !== '' && value !== null ? parseFloat(value) : null;
-          break;
-        case 'date-range':
-          upsertData.value = JSON.stringify(value);
-          break;
-        case 'text':
-        case 'status':
-        case 'priority':
-        case 'notes':
-        case 'file':
-        default:
-          upsertData.value = value !== null ? String(value) : null;
-          break;
-      }
+      const existingValue = itemValues.find(
+        (val) => val.item_id === itemId && val.column_id === columnId
+      );
 
-      console.log('Upserting data:', upsertData);
+      if (existingValue) {
+        const { error } = await supabase
+          .from('item_values')
+          .update({ value, updated_at: new Date().toISOString() })
+          .eq('id', existingValue.id);
 
-      // Use upsert with conflict resolution
-      const { data, error } = await supabase
-        .from('item_values')
-        .upsert(upsertData, { onConflict: 'item_id,column_id' })
-        .select();
+        if (error) {
+          console.error('Error updating item value:', error);
+          return;
+        }
 
-      if (error) {
-        console.error('Error updating item value:', error);
-        return;
-      }
+        setItemValues(prev =>
+          prev.map(val =>
+            val.id === existingValue.id
+              ? { ...val, value, updated_at: new Date().toISOString() }
+              : val
+          )
+        );
+      } else {
+        const { data, error } = await supabase
+          .from('item_values')
+          .insert([{ item_id: itemId, column_id: columnId, value }])
+          .select();
 
-      console.log('Successfully updated item value:', data);
+        if (error) {
+          console.error('Error creating item value:', error);
+          return;
+        }
 
-      if (data && data[0]) {
-        setItemValues((prev) => {
-          const rest = prev.filter(
-            (v) => !(v.item_id === itemId && v.column_id === columnId)
-          );
-          return [...rest, data[0]];
-        });
+        if (data) {
+          setItemValues(prev => [...prev, ...data]);
+        }
       }
     } catch (error) {
       console.error('Unexpected error updating item value:', error);
-    }
-  };
-
-  const createDefaultItemValues = async (itemId: string) => {
-    const valuesToCreate = columns.map(column => {
-      let insertData: any = {
-        item_id: itemId,
-        column_id: column.id,
-        value: null,
-        date_value: null,
-        number_value: null
-      };
-
-      // Set appropriate default values based on column type
-      switch (column.type) {
-        case 'timestamp':
-        case 'last updated':
-          insertData.date_value = new Date().toISOString().split('T')[0];
-          break;
-        case 'date':
-          insertData.date_value = null;
-          break;
-        case 'number':
-          insertData.number_value = null;
-          break;
-        case 'date-range':
-          insertData.value = JSON.stringify({ start: '', end: '' });
-          break;
-        default:
-          insertData.value = '';
-          break;
-      }
-
-      return insertData;
-    });
-
-    if (valuesToCreate.length > 0) {
-      const { data, error } = await supabase
-        .from('item_values')
-        .insert(valuesToCreate)
-        .select();
-
-      if (error) {
-        console.error('Error creating default item values:', error);
-        return;
-      }
-
-      if (data) {
-        setItemValues(prev => [...prev, ...data]);
-      }
     }
   };
 
@@ -353,12 +176,9 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      if (data && data[0]) {
+      if (data) {
         setItems(prev => [...prev, ...data]);
         setNewItemName('');
-        
-        // Create default values for all columns
-        await createDefaultItemValues(data[0].id);
       }
     } catch (error) {
       console.error('Unexpected error adding item:', error);
@@ -389,19 +209,87 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       if (data) {
-        // Transform the new column data to match our interface
-        const transformedNewColumns: Column[] = data.map(col => ({
-          ...col,
-          options: Array.isArray(col.options) ? col.options as string[] : null
-        }));
-        
-        setColumns(prev => [...prev, ...transformedNewColumns]);
+        setColumns(prev => [...prev, ...data]);
         setNewColumnName('');
         setNewColumnType('text');
       }
     } catch (error) {
       console.error('Unexpected error adding column:', error);
     }
+  };
+
+  const renderCellInput = (item: Item, column: Column) => {
+    const cellKey = `${item.id}-${column.id}`;
+    const currentValue = getItemValue(item.id, column.id);
+    const isEditing = editingCell === cellKey;
+
+    if (!isEditing) {
+      return (
+        <div
+          className="min-h-[2rem] p-2 cursor-pointer hover:bg-gray-50 rounded border-transparent border"
+          onClick={() => setEditingCell(cellKey)}
+        >
+          {column.type === 'checkbox' ? (
+            <Checkbox
+              checked={currentValue === 'true'}
+              onCheckedChange={(checked) => {
+                updateItemValue(item.id, column.id, checked ? 'true' : 'false');
+              }}
+            />
+          ) : (
+            <span className="text-sm">{currentValue || 'Click to edit'}</span>
+          )}
+        </div>
+      );
+    }
+
+    if (column.type === 'checkbox') {
+      return (
+        <Checkbox
+          checked={currentValue === 'true'}
+          onCheckedChange={(checked) => {
+            updateItemValue(item.id, column.id, checked ? 'true' : 'false');
+            setEditingCell(null);
+          }}
+          autoFocus
+        />
+      );
+    }
+
+    if (column.type === 'textarea') {
+      return (
+        <Textarea
+          value={currentValue}
+          onChange={(e) => updateItemValue(item.id, column.id, e.target.value)}
+          onBlur={() => setEditingCell(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              setEditingCell(null);
+            }
+          }}
+          className="min-h-[2rem]"
+          autoFocus
+        />
+      );
+    }
+
+    return (
+      <Input
+        type={column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : 'text'}
+        value={currentValue}
+        onChange={(e) => updateItemValue(item.id, column.id, e.target.value)}
+        onBlur={() => setEditingCell(null)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            setEditingCell(null);
+          }
+        }}
+        className="border-blue-500"
+        autoFocus
+      />
+    );
   };
 
   if (loading) {
@@ -440,13 +328,10 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 className="px-3 py-2 border rounded-md text-sm"
               >
                 <option value="text">Text</option>
-                <option value="status">Status</option>
-                <option value="priority">Priority</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
-                <option value="notes">Notes</option>
-                <option value="file">File</option>
-                <option value="timestamp">Timestamp</option>
+                <option value="checkbox">Checkbox</option>
+                <option value="textarea">Textarea</option>
               </select>
               <Button onClick={addNewColumn} size="sm">
                 <Plus className="w-4 h-4" />
@@ -461,6 +346,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="font-semibold">Item Name</TableHead>
                 {columns.map((column) => (
                   <TableHead key={column.id} className="font-semibold min-w-[150px]">
                     {column.name}
@@ -472,42 +358,16 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item.id}>
-                  {columns.map((column) => {
-                    const cellKey = `${item.id}-${column.id}`;
-                    const currentValue = getItemValue(item.id, column.id, column);
-                    const isReadonly = column.is_readonly || column.type === 'timestamp' || column.type === 'last updated';
-                    
-                    return (
-                      <TableCell key={cellKey} className="p-2">
-                        {editingCell === cellKey && !isReadonly ? (
-                          <CellEditor
-                            column={column}
-                            value={currentValue}
-                            onValueChange={(value) => {
-                              updateItemValue(item.id, column.id, value, column);
-                              setEditingCell(null);
-                            }}
-                            onBlur={() => setEditingCell(null)}
-                            isEditing={true}
-                            onClick={() => {}}
-                          />
-                        ) : (
-                          <div 
-                            onClick={() => !isReadonly && setEditingCell(cellKey)} 
-                            className={`cursor-pointer p-2 rounded hover:bg-gray-50 min-h-[32px] flex items-center ${
-                              isReadonly ? 'cursor-default' : ''
-                            }`}
-                          >
-                            {renderCellValue(currentValue, column)}
-                          </div>
-                        )}
-                      </TableCell>
-                    );
-                  })}
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  {columns.map((column) => (
+                    <TableCell key={`${item.id}-${column.id}`} className="p-0">
+                      {renderCellInput(item, column)}
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
               <TableRow>
-                <TableCell colSpan={columns.length}>
+                <TableCell colSpan={columns.length + 1}>
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder="New item name"
@@ -534,7 +394,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
         {items.length === 0 && columns.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            <p>No columns or items yet. Create a new board to see the default columns!</p>
+            <p>No columns or items yet. Add a column to get started!</p>
           </div>
         )}
       </CardContent>
