@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,7 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 interface Column {
   id: string;
@@ -43,7 +43,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     setDraft(value);
   }, [value]);
 
-  const isReadonly = column.is_readonly || column.type === 'timestamp' || column.type === 'last updated';
+  const isReadonly = column.is_readonly || column.type === 'timestamp';
 
   if (!isEditing || isReadonly) {
     return (
@@ -53,7 +53,7 @@ const CellEditor: React.FC<CellEditorProps> = ({
     );
   }
 
-  if ((column.type === 'status' || column.type === 'priority') && column.options) {
+  if (column.type === 'status' && column.options) {
     return (
       <Select onValueChange={(val) => {
         onValueChange(val);
@@ -94,20 +94,6 @@ const CellEditor: React.FC<CellEditorProps> = ({
           />
         </PopoverContent>
       </Popover>
-    );
-  }
-
-  if (column.type === 'notes') {
-    return (
-      <Textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          onValueChange(draft);
-          onBlur();
-        }}
-        autoFocus
-      />
     );
   }
 

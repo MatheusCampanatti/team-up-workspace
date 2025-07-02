@@ -35,7 +35,6 @@ interface ItemValue {
   value: string | null;
   date_value: string | null;
   number_value: number | null;
-  boolean_value: boolean | null;
   updated_at: string;
 }
 
@@ -232,12 +231,9 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     switch (column.type) {
       case 'date':
       case 'timestamp':
-      case 'last updated':
         return itemValue.date_value || '';
       case 'number':
         return itemValue.number_value !== null ? itemValue.number_value : '';
-      case 'boolean':
-        return itemValue.boolean_value !== null ? itemValue.boolean_value : false;
       default:
         return itemValue.value || '';
     }
@@ -249,35 +245,28 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return '';
       case 'date':
       case 'timestamp':
-      case 'last updated':
         return '';
-      case 'boolean':
-        return false;
       default:
         return '';
     }
   };
 
   const renderCellValue = (value: any, column: Column) => {
-    if (!value && value !== 0 && value !== false) return <span className="text-gray-400">-</span>;
+    if (!value && value !== 0) return <span className="text-gray-400">-</span>;
 
     switch (column.type) {
       case 'status':
-      case 'priority':
         return (
           <Badge 
             variant={
-              value === 'Done' || value === 'High' ? 'default' :
-              value === 'Working on it' || value === 'Medium' ? 'secondary' :
-              value === 'Stuck' || value === 'Low' ? 'outline' : 'secondary'
+              value === 'Done' ? 'default' :
+              value === 'Working on it' ? 'secondary' :
+              value === 'Stuck' ? 'outline' : 'secondary'
             }
             className={
               value === 'Done' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
               value === 'Working on it' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
               value === 'Stuck' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
-              value === 'High' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
-              value === 'Medium' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
-              value === 'Low' ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
               ''
             }
           >
@@ -287,7 +276,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       
       case 'date':
       case 'timestamp':
-      case 'last updated':
         if (!value) return <span className="text-gray-400">-</span>;
         try {
           const date = new Date(value);
@@ -299,9 +287,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       case 'number':
         return <span className="text-sm font-mono">{value}</span>;
       
-      case 'boolean':
-        return <span className="text-sm">{value ? 'Yes' : 'No'}</span>;
-      
       case 'file':
         if (value) {
           return (
@@ -311,16 +296,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           );
         }
         return <span className="text-gray-400">No file</span>;
-      
-      case 'notes':
-        if (value && value.length > 50) {
-          return (
-            <span className="text-sm" title={value}>
-              {value.substring(0, 50)}...
-            </span>
-          );
-        }
-        return <span className="text-sm">{value || '-'}</span>;
       
       default:
         return <span className="text-sm">{value || '-'}</span>;
@@ -338,28 +313,18 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         updated_at: new Date().toISOString(),
         value: null,
         date_value: null,
-        number_value: null,
-        boolean_value: null
+        number_value: null
       };
       
       // Set the appropriate value field based on column type
       switch (column.type) {
         case 'date':
         case 'timestamp':
-        case 'last updated':
           upsertData.date_value = value || null;
           break;
         case 'number':
           upsertData.number_value = value !== '' && value !== null ? parseFloat(value) : null;
           break;
-        case 'boolean':
-          upsertData.boolean_value = Boolean(value);
-          break;
-        case 'text':
-        case 'status':
-        case 'priority':
-        case 'notes':
-        case 'file':
         default:
           upsertData.value = value !== null ? String(value) : null;
           break;
@@ -379,7 +344,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       console.log('Successfully updated item value:', data);
-      // Real-time subscription will handle updating the state
     } catch (error) {
       console.error('Unexpected error updating item value:', error);
     }
@@ -392,14 +356,12 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         column_id: column.id,
         value: null,
         date_value: null,
-        number_value: null,
-        boolean_value: null
+        number_value: null
       };
 
       // Set appropriate default values based on column type
       switch (column.type) {
         case 'timestamp':
-        case 'last updated':
           insertData.date_value = new Date().toISOString().split('T')[0];
           break;
         case 'date':
@@ -407,9 +369,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           break;
         case 'number':
           insertData.number_value = null;
-          break;
-        case 'boolean':
-          insertData.boolean_value = false;
           break;
         default:
           insertData.value = '';
@@ -431,7 +390,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       console.log('Created default item values:', data);
-      // Real-time subscription will handle updating the state
     }
   };
 
@@ -479,8 +437,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       let options = null;
       if (newColumnType === 'status') {
         options = ["Not started", "Working on it", "Stuck", "Done"];
-      } else if (newColumnType === 'priority') {
-        options = ["Low", "Medium", "High"];
       }
 
       const { data, error } = await supabase
@@ -502,7 +458,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       if (data) {
         setNewColumnName('');
         setNewColumnType('text');
-        // Real-time subscription will handle updating the state
       }
     } catch (error) {
       console.error('Unexpected error adding column:', error);
@@ -546,12 +501,9 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
               >
                 <option value="text">Text</option>
                 <option value="status">Status</option>
-                <option value="priority">Priority</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
-                <option value="notes">Notes</option>
                 <option value="file">File</option>
-                <option value="boolean">Boolean</option>
                 <option value="timestamp">Timestamp</option>
               </select>
               <Button onClick={addNewColumn} size="sm">
@@ -581,7 +533,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                   {columns.map((column) => {
                     const cellKey = `${item.id}-${column.id}`;
                     const currentValue = getItemValue(item.id, column.id, column);
-                    const isReadonly = column.is_readonly || column.type === 'timestamp' || column.type === 'last updated';
+                    const isReadonly = column.is_readonly || column.type === 'timestamp';
                     
                     return (
                       <TableCell key={cellKey} className="p-2">
