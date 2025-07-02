@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
 import CellEditor from './CellEditor';
 
@@ -123,6 +123,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     switch (column.type) {
       case 'date':
       case 'timestamp':
+      case 'last updated':
         return itemValue.date_value || '';
       case 'number':
         return itemValue.number_value || '';
@@ -134,6 +135,83 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         }
       default:
         return itemValue.value || '';
+    }
+  };
+
+  const renderCellValue = (value: any, column: Column) => {
+    if (!value && value !== 0) return <span className="text-gray-400">-</span>;
+
+    switch (column.type) {
+      case 'status':
+      case 'priority':
+        return (
+          <Badge 
+            variant={
+              value === 'Done' || value === 'High' ? 'default' :
+              value === 'Working on it' || value === 'Medium' ? 'secondary' :
+              value === 'Stuck' || value === 'Low' ? 'outline' : 'secondary'
+            }
+            className={
+              value === 'Done' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+              value === 'Working on it' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
+              value === 'Stuck' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+              value === 'High' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+              value === 'Medium' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
+              value === 'Low' ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
+              ''
+            }
+          >
+            {value}
+          </Badge>
+        );
+      
+      case 'date':
+      case 'timestamp':
+      case 'last updated':
+        if (!value) return <span className="text-gray-400">-</span>;
+        try {
+          const date = new Date(value);
+          return <span className="text-sm">{date.toLocaleDateString()}</span>;
+        } catch {
+          return <span className="text-sm">{value}</span>;
+        }
+      
+      case 'date-range':
+        if (typeof value === 'object' && value.start && value.end) {
+          const startDate = new Date(value.start).toLocaleDateString();
+          const endDate = new Date(value.end).toLocaleDateString();
+          return <span className="text-sm">{startDate} - {endDate}</span>;
+        } else if (typeof value === 'object' && (value.start || value.end)) {
+          const date = value.start || value.end;
+          return <span className="text-sm">{new Date(date).toLocaleDateString()}</span>;
+        }
+        return <span className="text-gray-400">-</span>;
+      
+      case 'number':
+        return <span className="text-sm font-mono">{value}</span>;
+      
+      case 'file':
+        if (value) {
+          return (
+            <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+              📎 {value}
+            </span>
+          );
+        }
+        return <span className="text-gray-400">No file</span>;
+      
+      case 'notes':
+        if (value && value.length > 50) {
+          return (
+            <span className="text-sm" title={value}>
+              {value.substring(0, 50)}...
+            </span>
+          );
+        }
+        return <span className="text-sm">{value || '-'}</span>;
+      
+      default:
+        return <span className="text-sm">{value || '-'}</span>;
     }
   };
 
@@ -152,6 +230,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       switch (column.type) {
         case 'date':
         case 'timestamp':
+        case 'last updated':
           upsertData.date_value = value || null;
           upsertData.value = null;
           upsertData.number_value = null;
@@ -393,17 +472,29 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                   {columns.map((column) => {
                     const cellKey = `${item.id}-${column.id}`;
                     const currentValue = getItemValue(item.id, column.id, column);
+                    const isReadonly = column.is_readonly || column.type === 'timestamp' || column.type === 'last updated';
                     
                     return (
-                      <TableCell key={cellKey} className="p-0">
-                        <CellEditor
-                          column={column}
-                          value={currentValue}
-                          onValueChange={(value) => updateItemValue(item.id, column.id, value, column)}
-                          onBlur={() => setEditingCell(null)}
-                          isEditing={editingCell === cellKey}
-                          onClick={() => setEditingCell(cellKey)}
-                        />
+                      <TableCell key={cellKey} className="p-2">
+                        {editingCell === cellKey && !isReadonly ? (
+                          <CellEditor
+                            column={column}
+                            value={currentValue}
+                            onValueChange={(value) => updateItemValue(item.id, column.id, value, column)}
+                            onBlur={() => setEditingCell(null)}
+                            isEditing={true}
+                            onClick={() => {}}
+                          />
+                        ) : (
+                          <div 
+                            onClick={() => !isReadonly && setEditingCell(cellKey)} 
+                            className={`cursor-pointer p-2 rounded hover:bg-gray-50 min-h-[32px] flex items-center ${
+                              isReadonly ? 'cursor-default' : ''
+                            }`}
+                          >
+                            {renderCellValue(currentValue, column)}
+                          </div>
+                        )}
                       </TableCell>
                     );
                   })}
