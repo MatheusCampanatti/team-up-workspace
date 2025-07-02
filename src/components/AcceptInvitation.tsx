@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AcceptInvitationResponse } from "@/types/rpc";
 
 const AcceptInvitation = () => {
   const [searchParams] = useSearchParams();
@@ -72,7 +74,10 @@ const AcceptInvitation = () => {
         return;
       }
 
-      if (data?.success) {
+      // Cast the Json response to our expected type
+      const response = data as AcceptInvitationResponse;
+
+      if (response?.success) {
         setAccepted(true);
         toast({
           title: "Invitation accepted!",
@@ -80,18 +85,14 @@ const AcceptInvitation = () => {
         });
 
         setTimeout(() => {
-          navigate(`/company/${data.company_id}/boards`);
+          navigate(`/company/${response.company_id}/boards`);
         }, 2000);
       } else {
-        setError(
-          typeof data?.error === "string"
-            ? data.error
-            : "Failed to accept invitation"
-        );
+        setError(response?.error || "Failed to accept invitation");
       }
     } catch (err: any) {
       console.error("Unexpected error accepting invitation:", err);
-      setError(err.message || "Unexpected error");
+      setError(String(err.message) || "Unexpected error");
     } finally {
       setLoading(false);
     }
