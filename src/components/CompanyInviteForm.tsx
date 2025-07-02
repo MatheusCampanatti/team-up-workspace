@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { sendInviteEmail } from '@/libs/email';
 
 interface CompanyInviteFormProps {
   companyId: string;
@@ -25,43 +27,41 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from('company_invitations')
-        .insert([{
-          email,
-          company_id: companyId,
-          role,
-          status: 'pending',
-          token: null
-        }], { defaultToNull: true })
-        .select();
+      const token = uuidv4();
 
-      if (error) {
-        console.error('Error sending invitation:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to send invitation. Please try again.',
-          variant: 'destructive',
+      const { error } = await supabase
+        .from('company_invitations')
+        .insert([{ email, company_id: companyId, role, status: 'pending', token }]);
+
+      if (error) throw error;
+
+      const sent = await sendInviteEmail(email, token);
+      if (!sent) {
+        toast({ 
+          title: 'Warning', 
+          description: 'Invitation saved but email not sent', 
+          variant: 'destructive' 
         });
         return;
       }
 
+      toast({ 
+        title: 'Invitation sent!', 
+        description: `Invitation sent to ${email}` 
+      });
+      
       setEmail('');
       setRole('Member');
-      toast({
-        title: 'Invitation sent!',
-        description: `Invitation has been sent to ${email}`,
-      });
-
+      
       if (onInvitationSent) {
         onInvitationSent();
       }
-    } catch (error) {
-      console.error('Unexpected error sending invitation:', error);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive',
+    } catch (err: any) {
+      console.error(err);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to send invitation', 
+        variant: 'destructive' 
       });
     } finally {
       setLoading(false);
@@ -120,5 +120,3 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
 };
 
 export default CompanyInviteForm;
-
-
