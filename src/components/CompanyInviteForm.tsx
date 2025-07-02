@@ -31,7 +31,8 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
           email,
           company_id: companyId,
           role,
-          status: 'pending'
+          status: 'pending',
+          token: null
         }], { defaultToNull: true })
         .select();
 
@@ -119,3 +120,5 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
 };
 
 export default CompanyInviteForm;
+
+
