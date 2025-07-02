@@ -197,7 +197,7 @@ export type Database = {
             foreignKeyName: "item_values_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
-            referencedRelation: "items"
+            referencedRelation: "board_items"
             referencedColumns: ["id"]
           },
         ]

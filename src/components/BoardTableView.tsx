@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -177,10 +178,10 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           break;
       }
 
-          // Use upsert with conflict resolution
+      // Use upsert with conflict resolution - fix: use string instead of array
       const { data, error } = await supabase
         .from('item_values')
-        .upsert(upsertData, { onConflict: ['item_id', 'column_id'] })
+        .upsert(upsertData, { onConflict: 'item_id,column_id' })
         .select();
 
       if (error) {
