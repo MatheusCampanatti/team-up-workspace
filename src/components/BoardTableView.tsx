@@ -5,13 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, File } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { Plus } from 'lucide-react';
+import CellEditor from './CellEditor';
 
 interface Column {
   id: string;
@@ -19,9 +15,9 @@ interface Column {
   type: string;
   board_id: string;
   order: number | null;
-  options: string[] | null;
-  is_readonly: boolean | null;
   created_at: string;
+  options?: string[] | null;
+  is_readonly?: boolean | null;
 }
 
 interface Item {
@@ -37,10 +33,9 @@ interface ItemValue {
   item_id: string;
   column_id: string;
   value: string | null;
-  number_value: number | null;
   date_value: string | null;
-  boolean_value: boolean | null;
-  updated_at: string | null;
+  number_value: number | null;
+  updated_at: string;
 }
 
 interface BoardTableViewProps {
@@ -59,203 +54,280 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
   useEffect(() => {
     fetchBoardData();
-    setupRealtimeSubscription();
   }, [boardId]);
-
-  const setupRealtimeSubscription = () => {
-    const channel = supabase
-      .channel('board-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'item_values'
-        },
-        () => {
-          console.log('Item values changed, refetching data');
-          fetchItemValues();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'board_items'
-        },
-        () => {
-          console.log('Board items changed, refetching data');
-          fetchItems();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'board_columns'
-        },
-        () => {
-          console.log('Board columns changed, refetching data');
-          fetchColumns();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
 
   const fetchBoardData = async () => {
     setLoading(true);
     console.log('Fetching board data for boardId:', boardId);
 
     try {
-      await Promise.all([
-        fetchColumns(),
-        fetchItems(),
-        fetchItemValues()
-      ]);
+      // Fetch columns from board_columns table
+      const { data: columnsData, error: columnsError } = await supabase
+        .from('board_columns')
+        .select('*')
+        .eq('board_id', boardId)
+        .order('order', { ascending: true, nullsFirst: false });
+
+      if (columnsError) {
+        console.error('Error fetching columns:', columnsError);
+        return;
+      }
+
+      // Fetch items from board_items table
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('board_items')
+        .select('*')
+        .eq('board_id', boardId)
+        .order('order', { ascending: true, nullsFirst: false });
+
+      if (itemsError) {
+        console.error('Error fetching items:', itemsError);
+        return;
+      }
+
+      // Fetch item values
+      const { data: valuesData, error: valuesError } = await supabase
+        .from('item_values')
+        .select('*');
+
+      if (valuesError) {
+        console.error('Error fetching item values:', valuesError);
+        return;
+      }
+
+      console.log('Fetched data:', { columnsData, itemsData, valuesData });
+      
+      // Transform columns data to match our interface
+      const transformedColumns: Column[] = (columnsData || []).map(col => ({
+        ...col,
+        options: Array.isArray(col.options) ? col.options as string[] : null
+      }));
+      
+      setColumns(transformedColumns);
+      setItems(itemsData || []);
+      setItemValues(valuesData || []);
     } catch (error) {
-      console.error('Error fetching board data:', error);
+      console.error('Unexpected error fetching board data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchColumns = async () => {
-    const { data, error } = await supabase
-      .from('board_columns')
-      .select('*')
-      .eq('board_id', boardId)
-      .order('order', { ascending: true, nullsFirst: false });
-
-    if (error) {
-      console.error('Error fetching columns:', error);
-      return;
-    }
-
-    console.log('Fetched columns:', data);
-    setColumns(data || []);
-  };
-
-  const fetchItems = async () => {
-    const { data, error } = await supabase
-      .from('board_items')
-      .select('*')
-      .eq('board_id', boardId)
-      .order('order', { ascending: true, nullsFirst: false });
-
-    if (error) {
-      console.error('Error fetching items:', error);
-      return;
-    }
-
-    console.log('Fetched items:', data);
-    setItems(data || []);
-  };
-
-  const fetchItemValues = async () => {
-    const { data, error } = await supabase
-      .from('item_values')
-      .select('*');
-
-    if (error) {
-      console.error('Error fetching item values:', error);
-      return;
-    }
-
-    console.log('Fetched item values:', data);
-    setItemValues(data || []);
-  };
-
-  const getItemValue = (itemId: string, columnId: string): ItemValue | null => {
-    return itemValues.find(
+  const getItemValue = (itemId: string, columnId: string, column: Column): any => {
+    const itemValue = itemValues.find(
       (value) => value.item_id === itemId && value.column_id === columnId
-    ) || null;
+    );
+    
+    if (!itemValue) return '';
+    
+    // Return appropriate value based on column type
+    switch (column.type) {
+      case 'date':
+      case 'timestamp':
+      case 'last updated':
+        return itemValue.date_value || '';
+      case 'number':
+        return itemValue.number_value !== null ? itemValue.number_value : '';
+      case 'date-range':
+        try {
+          return itemValue.value ? JSON.parse(itemValue.value) : { start: '', end: '' };
+        } catch {
+          return { start: '', end: '' };
+        }
+      default:
+        return itemValue.value || '';
+    }
   };
 
-  const updateItemValue = async (itemId: string, columnId: string, value: any, columnType: string) => {
-    console.log('Updating item value:', { itemId, columnId, value, columnType });
+  const renderCellValue = (value: any, column: Column) => {
+    if (!value && value !== 0) return <span className="text-gray-400">-</span>;
+
+    switch (column.type) {
+      case 'status':
+      case 'priority':
+        return (
+          <Badge 
+            variant={
+              value === 'Done' || value === 'High' ? 'default' :
+              value === 'Working on it' || value === 'Medium' ? 'secondary' :
+              value === 'Stuck' || value === 'Low' ? 'outline' : 'secondary'
+            }
+            className={
+              value === 'Done' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+              value === 'Working on it' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
+              value === 'Stuck' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+              value === 'High' ? 'bg-red-100 text-red-800 hover:bg-red-200' :
+              value === 'Medium' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
+              value === 'Low' ? 'bg-gray-100 text-gray-800 hover:bg-gray-200' :
+              ''
+            }
+          >
+            {value}
+          </Badge>
+        );
+      
+      case 'date':
+      case 'timestamp':
+      case 'last updated':
+        if (!value) return <span className="text-gray-400">-</span>;
+        try {
+          const date = new Date(value);
+          return <span className="text-sm">{date.toLocaleDateString()}</span>;
+        } catch {
+          return <span className="text-sm">{value}</span>;
+        }
+      
+      case 'date-range':
+        if (typeof value === 'object' && value.start && value.end) {
+          const startDate = new Date(value.start).toLocaleDateString();
+          const endDate = new Date(value.end).toLocaleDateString();
+          return <span className="text-sm">{startDate} - {endDate}</span>;
+        } else if (typeof value === 'object' && (value.start || value.end)) {
+          const date = value.start || value.end;
+          return <span className="text-sm">{new Date(date).toLocaleDateString()}</span>;
+        }
+        return <span className="text-gray-400">-</span>;
+      
+      case 'number':
+        return <span className="text-sm font-mono">{value}</span>;
+      
+      case 'file':
+        if (value) {
+          return (
+            <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
+              📎 {value}
+            </span>
+          );
+        }
+        return <span className="text-gray-400">No file</span>;
+      
+      case 'notes':
+        if (value && value.length > 50) {
+          return (
+            <span className="text-sm" title={value}>
+              {value.substring(0, 50)}...
+            </span>
+          );
+        }
+        return <span className="text-sm">{value || '-'}</span>;
+      
+      default:
+        return <span className="text-sm">{value || '-'}</span>;
+    }
+  };
+
+  const updateItemValue = async (itemId: string, columnId: string, value: any, column: Column) => {
+    console.log('Updating item value:', { itemId, columnId, value, columnType: column.type });
 
     try {
-      const existingValue = getItemValue(itemId, columnId);
-      
-      // Prepare the data based on column type
-      let valueData: any = {
+      // Prepare upsert data based on column type
+      let upsertData: any = {
         item_id: itemId,
         column_id: columnId,
         updated_at: new Date().toISOString(),
         value: null,
-        number_value: null,
         date_value: null,
-        boolean_value: null
+        number_value: null
       };
-
-      // Set the appropriate field based on column type
-      switch (columnType) {
-        case 'number':
-          valueData.number_value = value ? parseFloat(value) : null;
-          valueData.value = value ? String(value) : null;
-          break;
+      
+      // Set the appropriate value field based on column type
+      switch (column.type) {
         case 'date':
-          valueData.date_value = value || null;
-          valueData.value = value || null;
+        case 'timestamp':
+        case 'last updated':
+          upsertData.date_value = value || null;
           break;
-        case 'checkbox':
-          valueData.boolean_value = value === 'true' || value === true;
-          valueData.value = valueData.boolean_value ? 'true' : 'false';
+        case 'number':
+          upsertData.number_value = value !== '' && value !== null ? parseFloat(value) : null;
           break;
+        case 'date-range':
+          upsertData.value = JSON.stringify(value);
+          break;
+        case 'text':
+        case 'status':
+        case 'priority':
+        case 'notes':
+        case 'file':
         default:
-          valueData.value = value || null;
+          upsertData.value = value !== null ? String(value) : null;
+          break;
       }
 
-      console.log('Prepared value data:', valueData);
+      console.log('Upserting data:', upsertData);
 
-      if (existingValue) {
-        // Update existing value
-        const { data, error } = await supabase
-          .from('item_values')
-          .update(valueData)
-          .eq('id', existingValue.id)
-          .select();
+      // Use upsert with conflict resolution
+      const { data, error } = await supabase
+        .from('item_values')
+        .upsert(upsertData, { onConflict: 'item_id,column_id' })
+        .select();
 
-        if (error) {
-          console.error('Error updating item value:', error);
-          return;
-        }
+      if (error) {
+        console.error('Error updating item value:', error);
+        return;
+      }
 
-        console.log('Updated item value:', data);
-        
-        // Update local state
-        setItemValues(prev => prev.map(val => 
-          val.id === existingValue.id 
-            ? { ...val, ...valueData }
-            : val
-        ));
-      } else {
-        // Insert new value
-        const { data, error } = await supabase
-          .from('item_values')
-          .insert([valueData])
-          .select();
+      console.log('Successfully updated item value:', data);
 
-        if (error) {
-          console.error('Error inserting item value:', error);
-          return;
-        }
-
-        console.log('Inserted new item value:', data);
-        
-        // Update local state
-        if (data && data.length > 0) {
-          setItemValues(prev => [...prev, ...data]);
-        }
+      if (data && data[0]) {
+        setItemValues((prev) => {
+          const rest = prev.filter(
+            (v) => !(v.item_id === itemId && v.column_id === columnId)
+          );
+          return [...rest, data[0]];
+        });
       }
     } catch (error) {
       console.error('Unexpected error updating item value:', error);
+    }
+  };
+
+  const createDefaultItemValues = async (itemId: string) => {
+    const valuesToCreate = columns.map(column => {
+      let insertData: any = {
+        item_id: itemId,
+        column_id: column.id,
+        value: null,
+        date_value: null,
+        number_value: null
+      };
+
+      // Set appropriate default values based on column type
+      switch (column.type) {
+        case 'timestamp':
+        case 'last updated':
+          insertData.date_value = new Date().toISOString().split('T')[0];
+          break;
+        case 'date':
+          insertData.date_value = null;
+          break;
+        case 'number':
+          insertData.number_value = null;
+          break;
+        case 'date-range':
+          insertData.value = JSON.stringify({ start: '', end: '' });
+          break;
+        default:
+          insertData.value = '';
+          break;
+      }
+
+      return insertData;
+    });
+
+    if (valuesToCreate.length > 0) {
+      const { data, error } = await supabase
+        .from('item_values')
+        .insert(valuesToCreate)
+        .select();
+
+      if (error) {
+        console.error('Error creating default item values:', error);
+        return;
+      }
+
+      if (data) {
+        setItemValues(prev => [...prev, ...data]);
+      }
     }
   };
 
@@ -281,11 +353,12 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      console.log('Added new item:', data);
-      setNewItemName('');
-      
-      if (data && data.length > 0) {
+      if (data && data[0]) {
         setItems(prev => [...prev, ...data]);
+        setNewItemName('');
+        
+        // Create default values for all columns
+        await createDefaultItemValues(data[0].id);
       }
     } catch (error) {
       console.error('Unexpected error adding item:', error);
@@ -315,201 +388,20 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      console.log('Added new column:', data);
-      setNewColumnName('');
-      setNewColumnType('text');
-      
-      if (data && data.length > 0) {
-        setColumns(prev => [...prev, ...data]);
+      if (data) {
+        // Transform the new column data to match our interface
+        const transformedNewColumns: Column[] = data.map(col => ({
+          ...col,
+          options: Array.isArray(col.options) ? col.options as string[] : null
+        }));
+        
+        setColumns(prev => [...prev, ...transformedNewColumns]);
+        setNewColumnName('');
+        setNewColumnType('text');
       }
     } catch (error) {
       console.error('Unexpected error adding column:', error);
     }
-  };
-
-  const renderCellValue = (item: Item, column: Column) => {
-    const itemValue = getItemValue(item.id, column.id);
-    const cellKey = `${item.id}-${column.id}`;
-    const isEditing = editingCell === cellKey;
-
-    if (column.is_readonly) {
-      // Handle readonly columns like timestamp
-      if (column.type === 'timestamp') {
-        return (
-          <div className="text-sm text-gray-600">
-            {itemValue?.updated_at ? format(new Date(itemValue.updated_at), 'PPp') : '-'}
-          </div>
-        );
-      }
-    }
-
-    const displayValue = () => {
-      if (!itemValue) return null;
-
-      switch (column.type) {
-        case 'status':
-          if (!itemValue.value) return null;
-          const statusColors: Record<string, string> = {
-            'Done': 'bg-green-100 text-green-800',
-            'Working on it': 'bg-blue-100 text-blue-800',
-            'Stuck': 'bg-red-100 text-red-800',
-            'Not started': 'bg-gray-100 text-gray-800',
-            'High': 'bg-red-100 text-red-800',
-            'Medium': 'bg-yellow-100 text-yellow-800',
-            'Low': 'bg-green-100 text-green-800'
-          };
-          return (
-            <Badge variant="secondary" className={statusColors[itemValue.value] || 'bg-gray-100 text-gray-800'}>
-              {itemValue.value}
-            </Badge>
-          );
-
-        case 'date':
-          if (!itemValue.date_value && !itemValue.value) return null;
-          const dateValue = itemValue.date_value || itemValue.value;
-          try {
-            return format(new Date(dateValue), 'PP');
-          } catch {
-            return dateValue;
-          }
-
-        case 'number':
-          return itemValue.number_value?.toString() || itemValue.value || null;
-
-        case 'checkbox':
-          return itemValue.boolean_value ? '✓' : '○';
-
-        case 'file':
-          return itemValue.value ? (
-            <div className="flex items-center gap-1">
-              <File className="w-4 h-4" />
-              <span className="text-sm">{itemValue.value}</span>
-            </div>
-          ) : null;
-
-        default:
-          return itemValue.value || null;
-      }
-    };
-
-    if (!isEditing) {
-      return (
-        <div
-          className="min-h-[2rem] p-2 cursor-pointer hover:bg-gray-50 rounded border-transparent border w-full"
-          onClick={() => !column.is_readonly && setEditingCell(cellKey)}
-        >
-          {displayValue() || <span className="text-gray-400 text-sm">Click to edit</span>}
-        </div>
-      );
-    }
-
-    // Render editing interface
-    const currentValue = itemValue?.value || '';
-
-    if (column.type === 'status' && column.options) {
-      return (
-        <select
-          value={currentValue}
-          onChange={(e) => {
-            updateItemValue(item.id, column.id, e.target.value, column.type);
-            setEditingCell(null);
-          }}
-          onBlur={() => setEditingCell(null)}
-          className="w-full p-2 border rounded"
-          autoFocus
-        >
-          <option value="">Select...</option>
-          {column.options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      );
-    }
-
-    if (column.type === 'date') {
-      return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "w-full justify-start text-left font-normal",
-                !currentValue && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {currentValue ? format(new Date(currentValue), "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={currentValue ? new Date(currentValue) : undefined}
-              onSelect={(date) => {
-                if (date) {
-                  updateItemValue(item.id, column.id, date.toISOString().split('T')[0], column.type);
-                }
-                setEditingCell(null);
-              }}
-              initialFocus
-              className="pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
-      );
-    }
-
-    if (column.type === 'textarea') {
-      return (
-        <Textarea
-          value={currentValue}
-          onChange={(e) => updateItemValue(item.id, column.id, e.target.value, column.type)}
-          onBlur={() => setEditingCell(null)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              setEditingCell(null);
-            }
-          }}
-          className="min-h-[2rem]"
-          autoFocus
-        />
-      );
-    }
-
-    if (column.type === 'checkbox') {
-      return (
-        <input
-          type="checkbox"
-          checked={currentValue === 'true'}
-          onChange={(e) => {
-            updateItemValue(item.id, column.id, e.target.checked, column.type);
-            setEditingCell(null);
-          }}
-          className="w-4 h-4"
-          autoFocus
-        />
-      );
-    }
-
-    return (
-      <Input
-        type={column.type === 'number' ? 'number' : 'text'}
-        value={currentValue}
-        onChange={(e) => updateItemValue(item.id, column.id, e.target.value, column.type)}
-        onBlur={() => setEditingCell(null)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            setEditingCell(null);
-          }
-        }}
-        className="border-blue-500"
-        autoFocus
-      />
-    );
   };
 
   if (loading) {
@@ -548,12 +440,13 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 className="px-3 py-2 border rounded-md text-sm"
               >
                 <option value="text">Text</option>
+                <option value="status">Status</option>
+                <option value="priority">Priority</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
-                <option value="status">Status</option>
-                <option value="checkbox">Checkbox</option>
-                <option value="textarea">Textarea</option>
+                <option value="notes">Notes</option>
                 <option value="file">File</option>
+                <option value="timestamp">Timestamp</option>
               </select>
               <Button onClick={addNewColumn} size="sm">
                 <Plus className="w-4 h-4" />
@@ -568,7 +461,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="font-semibold">Item Name</TableHead>
                 {columns.map((column) => (
                   <TableHead key={column.id} className="font-semibold min-w-[150px]">
                     {column.name}
@@ -580,16 +472,42 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  {columns.map((column) => (
-                    <TableCell key={`${item.id}-${column.id}`} className="p-0">
-                      {renderCellValue(item, column)}
-                    </TableCell>
-                  ))}
+                  {columns.map((column) => {
+                    const cellKey = `${item.id}-${column.id}`;
+                    const currentValue = getItemValue(item.id, column.id, column);
+                    const isReadonly = column.is_readonly || column.type === 'timestamp' || column.type === 'last updated';
+                    
+                    return (
+                      <TableCell key={cellKey} className="p-2">
+                        {editingCell === cellKey && !isReadonly ? (
+                          <CellEditor
+                            column={column}
+                            value={currentValue}
+                            onValueChange={(value) => {
+                              updateItemValue(item.id, column.id, value, column);
+                              setEditingCell(null);
+                            }}
+                            onBlur={() => setEditingCell(null)}
+                            isEditing={true}
+                            onClick={() => {}}
+                          />
+                        ) : (
+                          <div 
+                            onClick={() => !isReadonly && setEditingCell(cellKey)} 
+                            className={`cursor-pointer p-2 rounded hover:bg-gray-50 min-h-[32px] flex items-center ${
+                              isReadonly ? 'cursor-default' : ''
+                            }`}
+                          >
+                            {renderCellValue(currentValue, column)}
+                          </div>
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
               <TableRow>
-                <TableCell colSpan={columns.length + 1}>
+                <TableCell colSpan={columns.length}>
                   <div className="flex items-center gap-2">
                     <Input
                       placeholder="New item name"
@@ -616,7 +534,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
         {items.length === 0 && columns.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            <p>No columns or items yet. Add a column to get started!</p>
+            <p>No columns or items yet. Create a new board to see the default columns!</p>
           </div>
         )}
       </CardContent>
