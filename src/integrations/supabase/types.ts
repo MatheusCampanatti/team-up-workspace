@@ -14,7 +14,9 @@ export type Database = {
           board_id: string
           created_at: string | null
           id: string
+          is_readonly: boolean | null
           name: string
+          options: Json | null
           order: number | null
           type: string
         }
@@ -22,7 +24,9 @@ export type Database = {
           board_id: string
           created_at?: string | null
           id?: string
+          is_readonly?: boolean | null
           name: string
+          options?: Json | null
           order?: number | null
           type?: string
         }
@@ -30,7 +34,9 @@ export type Database = {
           board_id?: string
           created_at?: string | null
           id?: string
+          is_readonly?: boolean | null
           name?: string
+          options?: Json | null
           order?: number | null
           type?: string
         }
@@ -150,23 +156,32 @@ export type Database = {
       }
       item_values: {
         Row: {
+          boolean_value: boolean | null
           column_id: string | null
+          date_value: string | null
           id: string
           item_id: string | null
+          number_value: number | null
           updated_at: string | null
           value: string | null
         }
         Insert: {
+          boolean_value?: boolean | null
           column_id?: string | null
+          date_value?: string | null
           id?: string
           item_id?: string | null
+          number_value?: number | null
           updated_at?: string | null
           value?: string | null
         }
         Update: {
+          boolean_value?: boolean | null
           column_id?: string | null
+          date_value?: string | null
           id?: string
           item_id?: string | null
+          number_value?: number | null
           updated_at?: string | null
           value?: string | null
         }
@@ -182,7 +197,7 @@ export type Database = {
             foreignKeyName: "item_values_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
-            referencedRelation: "items"
+            referencedRelation: "board_items"
             referencedColumns: ["id"]
           },
         ]
@@ -278,7 +293,19 @@ export type Database = {
     }
     Functions: {
       check_user_is_admin: {
-        Args: { _user_id: string; _company_id: string }
+        Args: { _user_id: string; _company_id: string } | { company_id: string }
+        Returns: boolean
+      }
+      create_default_board_columns: {
+        Args: { board_id_param: string }
+        Returns: undefined
+      }
+      get_user_role_in_company: {
+        Args: { company_uuid: string }
+        Returns: string
+      }
+      user_has_company_access: {
+        Args: { company_uuid: string }
         Returns: boolean
       }
     }
