@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Edit } from 'lucide-react';
 import { useRealtimeItemValues } from '@/hooks/useRealtimeItemValues';
+import BoardFilters from './BoardFilters';
 
 interface Column {
   id: string;
@@ -47,6 +48,11 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   const [newItemName, setNewItemName] = useState('');
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState('text');
+
+  // Filter states (UI only, no logic implemented yet)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
 
   useEffect(() => {
     fetchBoardData();
@@ -511,97 +517,109 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Board Table
-          <div className="flex gap-2">
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Column name"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                className="w-32"
-              />
-              <select
-                value={newColumnType}
-                onChange={(e) => setNewColumnType(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm"
-              >
-                <option value="text">Text</option>
-                <option value="number">Number</option>
-                <option value="date">Date</option>
-                <option value="checkbox">Checkbox</option>
-                <option value="textarea">Textarea</option>
-                <option value="status">Status</option>
-                <option value="timestamp">Timestamp</option>
-              </select>
-              <Button onClick={addNewColumn} size="sm">
-                <Plus className="w-4 h-4" />
-                Column
-              </Button>
+    <div className="w-full space-y-6">
+      {/* Filters Section */}
+      <BoardFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        priorityFilter={priorityFilter}
+        onPriorityChange={setPriorityFilter}
+      />
+
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Board Table
+            <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Column name"
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  className="w-32"
+                />
+                <select
+                  value={newColumnType}
+                  onChange={(e) => setNewColumnType(e.target.value)}
+                  className="px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="checkbox">Checkbox</option>
+                  <option value="textarea">Textarea</option>
+                  <option value="status">Status</option>
+                  <option value="timestamp">Timestamp</option>
+                </select>
+                <Button onClick={addNewColumn} size="sm">
+                  <Plus className="w-4 h-4" />
+                  Column
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-semibold">Item Name</TableHead>
-                {columns.map((column) => (
-                  <TableHead key={column.id} className="font-semibold min-w-[150px]">
-                    {column.name}
-                    <span className="text-xs text-gray-500 ml-1">({column.type})</span>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="font-semibold">Item Name</TableHead>
                   {columns.map((column) => (
-                    <TableCell key={`${item.id}-${column.id}`} className="p-0">
-                      {renderCellInput(item, column)}
-                    </TableCell>
+                    <TableHead key={column.id} className="font-semibold min-w-[150px]">
+                      {column.name}
+                      <span className="text-xs text-gray-500 ml-1">({column.type})</span>
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-              <TableRow>
-                <TableCell colSpan={columns.length + 1}>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="New item name"
-                      value={newItemName}
-                      onChange={(e) => setNewItemName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addNewItem();
-                        }
-                      }}
-                      className="flex-1"
-                    />
-                    <Button onClick={addNewItem} size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Item
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-
-        {items.length === 0 && columns.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <p>No columns or items yet. Add a column to get started!</p>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    {columns.map((column) => (
+                      <TableCell key={`${item.id}-${column.id}`} className="p-0">
+                        {renderCellInput(item, column)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell colSpan={columns.length + 1}>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="New item name"
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addNewItem();
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button onClick={addNewItem} size="sm">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Item
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {items.length === 0 && columns.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>No columns or items yet. Add a column to get started!</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
