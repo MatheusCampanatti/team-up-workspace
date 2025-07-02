@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +32,7 @@ interface ItemValue {
   id: string;
   item_id: string;
   column_id: string;
-  value: string;
+  value: string | null;
   date_value: string | null;
   number_value: number | null;
   updated_at: string;
@@ -126,7 +127,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       case 'last updated':
         return itemValue.date_value || '';
       case 'number':
-        return itemValue.number_value || '';
+        return itemValue.number_value !== null ? itemValue.number_value : '';
       case 'date-range':
         try {
           return itemValue.value ? JSON.parse(itemValue.value) : { start: '', end: '' };
@@ -223,7 +224,10 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       let upsertData: any = {
         item_id: itemId,
         column_id: columnId,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        value: null,
+        date_value: null,
+        number_value: null
       };
       
       // Set the appropriate value field based on column type
@@ -232,18 +236,12 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         case 'timestamp':
         case 'last updated':
           upsertData.date_value = value || null;
-          upsertData.value = null;
-          upsertData.number_value = null;
           break;
         case 'number':
-          upsertData.number_value = value ? parseFloat(value) : null;
-          upsertData.value = null;
-          upsertData.date_value = null;
+          upsertData.number_value = value !== '' && value !== null ? parseFloat(value) : null;
           break;
         case 'date-range':
           upsertData.value = JSON.stringify(value);
-          upsertData.date_value = null;
-          upsertData.number_value = null;
           break;
         case 'text':
         case 'status':
@@ -251,13 +249,13 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         case 'notes':
         case 'file':
         default:
-          upsertData.value = value;
-          upsertData.date_value = null;
-          upsertData.number_value = null;
+          upsertData.value = value !== null ? String(value) : null;
           break;
       }
 
-      // Use upsert with conflict resolution - fix: use string instead of array
+      console.log('Upserting data:', upsertData);
+
+      // Use upsert with conflict resolution
       const { data, error } = await supabase
         .from('item_values')
         .upsert(upsertData, { onConflict: 'item_id,column_id' })
@@ -267,6 +265,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         console.error('Error updating item value:', error);
         return;
       }
+
+      console.log('Successfully updated item value:', data);
 
       if (data && data[0]) {
         setItemValues((prev) => {
@@ -286,6 +286,9 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       let insertData: any = {
         item_id: itemId,
         column_id: column.id,
+        value: null,
+        date_value: null,
+        number_value: null
       };
 
       // Set appropriate default values based on column type
@@ -480,7 +483,10 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                           <CellEditor
                             column={column}
                             value={currentValue}
-                            onValueChange={(value) => updateItemValue(item.id, column.id, value, column)}
+                            onValueChange={(value) => {
+                              updateItemValue(item.id, column.id, value, column);
+                              setEditingCell(null);
+                            }}
                             onBlur={() => setEditingCell(null)}
                             isEditing={true}
                             onClick={() => {}}

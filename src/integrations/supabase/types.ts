@@ -300,6 +300,14 @@ export type Database = {
         Args: { board_id_param: string }
         Returns: undefined
       }
+      get_user_role_in_company: {
+        Args: { company_uuid: string }
+        Returns: string
+      }
+      user_has_company_access: {
+        Args: { company_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
