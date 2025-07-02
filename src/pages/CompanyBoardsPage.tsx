@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
+import CompanyInviteForm from '@/components/CompanyInviteForm';
+import PendingInvitations from '@/components/PendingInvitations';
 
 interface Board {
   id: string;
@@ -236,6 +237,24 @@ const CompanyBoardsPage = () => {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Team Management Section - Only show for Admins */}
+        {companyId && company && (
+          <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CompanyInviteForm 
+              companyId={companyId} 
+              companyName={company.name}
+              onInviteSent={() => {
+                // Refresh invitations list
+                console.log('Invitation sent, refreshing...');
+              }}
+            />
+            <PendingInvitations 
+              companyId={companyId} 
+              companyName={company.name}
+            />
+          </div>
+        )}
 
         {/* Boards Grid */}
         {loading ? (

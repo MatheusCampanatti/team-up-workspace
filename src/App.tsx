@@ -10,6 +10,7 @@ import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import CompanyBoardsPage from "./pages/CompanyBoardsPage";
 import BoardPage from "./pages/BoardPage";
+import AcceptInvitePage from "./pages/AcceptInvitePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/company/:companyId/boards" element={<CompanyBoardsPage />} />
             <Route path="/board/:boardId" element={<BoardPage />} />
+            <Route path="/accept-invitation" element={<AcceptInvitePage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
