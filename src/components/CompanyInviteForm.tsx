@@ -32,7 +32,7 @@ const CompanyInviteForm: React.FC<CompanyInviteFormProps> = ({ companyId, onInvi
           company_id: companyId,
           role,
           status: 'pending'
-        }])
+        }], { defaultToNull: true })
         .select();
 
       if (error) {

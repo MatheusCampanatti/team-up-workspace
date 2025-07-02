@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -243,15 +244,13 @@ const CompanyBoardsPage = () => {
           <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
             <CompanyInviteForm 
               companyId={companyId} 
-              companyName={company.name}
-              onInviteSent={() => {
+              onInvitationSent={() => {
                 // Refresh invitations list
                 console.log('Invitation sent, refreshing...');
               }}
             />
             <PendingInvitations 
               companyId={companyId} 
-              companyName={company.name}
             />
           </div>
         )}

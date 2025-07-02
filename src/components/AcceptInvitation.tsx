@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,10 +46,10 @@ const AcceptInvitation = () => {
           });
           
           setTimeout(() => {
-            navigate(`/company/${data.company_id}/boards`);
+            navigate(`/company/${String(data.company_id)}/boards`);
           }, 2000);
         } else {
-          setError(data.error || 'Failed to accept invitation');
+          setError(String(data.error) || 'Failed to accept invitation');
         }
       } else {
         setError('Unexpected response from server');
