@@ -40,7 +40,15 @@ export type Database = {
           order?: number | null
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "board_columns_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       board_items: {
         Row: {
@@ -64,7 +72,15 @@ export type Database = {
           name?: string
           order?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "board_items_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       boards: {
         Row: {
@@ -98,38 +114,6 @@ export type Database = {
           },
         ]
       }
-      columns: {
-        Row: {
-          board_id: string
-          created_at: string | null
-          id: string
-          name: string
-          type: string
-        }
-        Insert: {
-          board_id: string
-          created_at?: string | null
-          id?: string
-          name: string
-          type: string
-        }
-        Update: {
-          board_id?: string
-          created_at?: string | null
-          id?: string
-          name?: string
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "columns_board_id_fkey"
-            columns: ["board_id"]
-            isOneToOne: false
-            referencedRelation: "boards"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       companies: {
         Row: {
           created_at: string
@@ -157,30 +141,30 @@ export type Database = {
       item_values: {
         Row: {
           boolean_value: boolean | null
-          column_id: string | null
+          column_id: string
           date_value: string | null
           id: string
-          item_id: string | null
+          item_id: string
           number_value: number | null
           updated_at: string | null
           value: string | null
         }
         Insert: {
           boolean_value?: boolean | null
-          column_id?: string | null
+          column_id: string
           date_value?: string | null
           id?: string
-          item_id?: string | null
+          item_id: string
           number_value?: number | null
           updated_at?: string | null
           value?: string | null
         }
         Update: {
           boolean_value?: boolean | null
-          column_id?: string | null
+          column_id?: string
           date_value?: string | null
           id?: string
-          item_id?: string | null
+          item_id?: string
           number_value?: number | null
           updated_at?: string | null
           value?: string | null
@@ -190,7 +174,7 @@ export type Database = {
             foreignKeyName: "item_values_column_id_fkey"
             columns: ["column_id"]
             isOneToOne: false
-            referencedRelation: "columns"
+            referencedRelation: "board_columns"
             referencedColumns: ["id"]
           },
           {
@@ -198,35 +182,6 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "board_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      items: {
-        Row: {
-          board_id: string
-          created_at: string | null
-          id: string
-          name: string
-        }
-        Insert: {
-          board_id: string
-          created_at?: string | null
-          id?: string
-          name: string
-        }
-        Update: {
-          board_id?: string
-          created_at?: string | null
-          id?: string
-          name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "items_board_id_fkey"
-            columns: ["board_id"]
-            isOneToOne: false
-            referencedRelation: "boards"
             referencedColumns: ["id"]
           },
         ]

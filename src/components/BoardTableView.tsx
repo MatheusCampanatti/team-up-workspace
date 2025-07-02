@@ -35,6 +35,7 @@ interface ItemValue {
   value: string | null;
   date_value: string | null;
   number_value: number | null;
+  boolean_value: boolean | null;
   updated_at: string;
 }
 
@@ -235,12 +236,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return itemValue.date_value || '';
       case 'number':
         return itemValue.number_value !== null ? itemValue.number_value : '';
-      case 'date-range':
-        try {
-          return itemValue.value ? JSON.parse(itemValue.value) : { start: '', end: '' };
-        } catch {
-          return { start: '', end: '' };
-        }
+      case 'boolean':
+        return itemValue.boolean_value !== null ? itemValue.boolean_value : false;
       default:
         return itemValue.value || '';
     }
@@ -248,21 +245,21 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
   const getDefaultValue = (column: Column): any => {
     switch (column.type) {
-      case 'date-range':
-        return { start: '', end: '' };
       case 'number':
         return '';
       case 'date':
       case 'timestamp':
       case 'last updated':
         return '';
+      case 'boolean':
+        return false;
       default:
         return '';
     }
   };
 
   const renderCellValue = (value: any, column: Column) => {
-    if (!value && value !== 0) return <span className="text-gray-400">-</span>;
+    if (!value && value !== 0 && value !== false) return <span className="text-gray-400">-</span>;
 
     switch (column.type) {
       case 'status':
@@ -299,19 +296,11 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           return <span className="text-sm">{value}</span>;
         }
       
-      case 'date-range':
-        if (typeof value === 'object' && value.start && value.end) {
-          const startDate = new Date(value.start).toLocaleDateString();
-          const endDate = new Date(value.end).toLocaleDateString();
-          return <span className="text-sm">{startDate} - {endDate}</span>;
-        } else if (typeof value === 'object' && (value.start || value.end)) {
-          const date = value.start || value.end;
-          return <span className="text-sm">{new Date(date).toLocaleDateString()}</span>;
-        }
-        return <span className="text-gray-400">-</span>;
-      
       case 'number':
         return <span className="text-sm font-mono">{value}</span>;
+      
+      case 'boolean':
+        return <span className="text-sm">{value ? 'Yes' : 'No'}</span>;
       
       case 'file':
         if (value) {
@@ -349,7 +338,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         updated_at: new Date().toISOString(),
         value: null,
         date_value: null,
-        number_value: null
+        number_value: null,
+        boolean_value: null
       };
       
       // Set the appropriate value field based on column type
@@ -362,8 +352,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         case 'number':
           upsertData.number_value = value !== '' && value !== null ? parseFloat(value) : null;
           break;
-        case 'date-range':
-          upsertData.value = JSON.stringify(value);
+        case 'boolean':
+          upsertData.boolean_value = Boolean(value);
           break;
         case 'text':
         case 'status':
@@ -402,7 +392,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         column_id: column.id,
         value: null,
         date_value: null,
-        number_value: null
+        number_value: null,
+        boolean_value: null
       };
 
       // Set appropriate default values based on column type
@@ -417,8 +408,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         case 'number':
           insertData.number_value = null;
           break;
-        case 'date-range':
-          insertData.value = JSON.stringify({ start: '', end: '' });
+        case 'boolean':
+          insertData.boolean_value = false;
           break;
         default:
           insertData.value = '';
@@ -560,6 +551,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 <option value="date">Date</option>
                 <option value="notes">Notes</option>
                 <option value="file">File</option>
+                <option value="boolean">Boolean</option>
                 <option value="timestamp">Timestamp</option>
               </select>
               <Button onClick={addNewColumn} size="sm">
