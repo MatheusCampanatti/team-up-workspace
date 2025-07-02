@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,6 +155,63 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     }
   };
 
+  const getDefaultValueForColumn = (column: Column): string => {
+    switch (column.type) {
+      case 'status':
+        if (column.name.toLowerCase().includes('status')) {
+          return 'Not started';
+        } else if (column.name.toLowerCase().includes('priority')) {
+          return 'Medium';
+        }
+        return '';
+      case 'date':
+        return '';
+      case 'number':
+        return '';
+      case 'text':
+      case 'textarea':
+        return '';
+      case 'checkbox':
+        return 'false';
+      case 'timestamp':
+        return new Date().toISOString();
+      default:
+        return '';
+    }
+  };
+
+  const createDefaultCellsForItem = async (itemId: string) => {
+    console.log('Creating default cells for item:', itemId);
+    
+    try {
+      // Create default values for all columns
+      const defaultValues = columns.map(column => ({
+        item_id: itemId,
+        column_id: column.id,
+        value: getDefaultValueForColumn(column)
+      }));
+
+      if (defaultValues.length > 0) {
+        const { data, error } = await supabase
+          .from('item_values')
+          .insert(defaultValues)
+          .select();
+
+        if (error) {
+          console.error('Error creating default cell values:', error);
+          return;
+        }
+
+        if (data) {
+          console.log('Created default cell values:', data);
+          setItemValues(prev => [...prev, ...data]);
+        }
+      }
+    } catch (error) {
+      console.error('Unexpected error creating default cells:', error);
+    }
+  };
+
   const addNewItem = async () => {
     if (!newItemName.trim()) return;
 
@@ -176,9 +234,13 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      if (data) {
-        setItems(prev => [...prev, ...data]);
+      if (data && data.length > 0) {
+        const newItem = data[0];
+        setItems(prev => [...prev, newItem]);
         setNewItemName('');
+        
+        // Create default cells for the new item
+        await createDefaultCellsForItem(newItem.id);
       }
     } catch (error) {
       console.error('Unexpected error adding item:', error);
@@ -236,6 +298,10 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 updateItemValue(item.id, column.id, checked ? 'true' : 'false');
               }}
             />
+          ) : column.type === 'timestamp' ? (
+            <span className="text-sm text-gray-500">
+              {currentValue ? new Date(currentValue).toLocaleString() : 'Never'}
+            </span>
           ) : (
             <span className="text-sm">{currentValue || 'Click to edit'}</span>
           )}
@@ -271,6 +337,62 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           className="min-h-[2rem]"
           autoFocus
         />
+      );
+    }
+
+    if (column.type === 'status') {
+      const options = ['Not started', 'Working on it', 'Stuck', 'Done'];
+      if (column.name.toLowerCase().includes('priority')) {
+        const priorityOptions = ['Low', 'Medium', 'High'];
+        return (
+          <select
+            value={currentValue}
+            onChange={(e) => {
+              updateItemValue(item.id, column.id, e.target.value);
+              setEditingCell(null);
+            }}
+            onBlur={() => setEditingCell(null)}
+            className="w-full px-2 py-1 border rounded"
+            autoFocus
+          >
+            {priorityOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        );
+      } else {
+        return (
+          <select
+            value={currentValue}
+            onChange={(e) => {
+              updateItemValue(item.id, column.id, e.target.value);
+              setEditingCell(null);
+            }}
+            onBlur={() => setEditingCell(null)}
+            className="w-full px-2 py-1 border rounded"
+            autoFocus
+          >
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        );
+      }
+    }
+
+    if (column.type === 'timestamp') {
+      // Timestamp columns are read-only, automatically update on any change
+      const now = new Date().toISOString();
+      updateItemValue(item.id, column.id, now);
+      setEditingCell(null);
+      return (
+        <span className="text-sm text-gray-500">
+          {new Date(now).toLocaleString()}
+        </span>
       );
     }
 
@@ -332,6 +454,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                 <option value="date">Date</option>
                 <option value="checkbox">Checkbox</option>
                 <option value="textarea">Textarea</option>
+                <option value="status">Status</option>
+                <option value="timestamp">Timestamp</option>
               </select>
               <Button onClick={addNewColumn} size="sm">
                 <Plus className="w-4 h-4" />
