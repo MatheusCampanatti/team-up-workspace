@@ -15,9 +15,9 @@ const AcceptInvitation = () => {
   const [error, setError] = useState<string | null>(null);
 
   const token = searchParams.get('token');
-
   const handleAcceptInvitation = async () => {
     if (!token) {
+      console.log("Invitation token from URL:", token);
       setError('Invalid invitation token');
       return;
     }
