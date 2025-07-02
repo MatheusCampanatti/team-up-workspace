@@ -54,14 +54,113 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
   useEffect(() => {
     fetchBoardData();
+    setupRealtimeSubscription();
+    
+    return () => {
+      supabase.removeAllChannels();
+    };
   }, [boardId]);
+
+  const setupRealtimeSubscription = () => {
+    // Subscribe to item_values changes for real-time updates
+    const itemValuesChannel = supabase
+      .channel('item_values_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'item_values'
+        },
+        (payload) => {
+          console.log('Real-time item_values change:', payload);
+          if (payload.eventType === 'INSERT') {
+            setItemValues(prev => [...prev, payload.new as ItemValue]);
+          } else if (payload.eventType === 'UPDATE') {
+            setItemValues(prev => 
+              prev.map(val => 
+                val.id === payload.new.id ? payload.new as ItemValue : val
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setItemValues(prev => 
+              prev.filter(val => val.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to board_items changes
+    const itemsChannel = supabase
+      .channel('board_items_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'board_items',
+          filter: `board_id=eq.${boardId}`
+        },
+        (payload) => {
+          console.log('Real-time board_items change:', payload);
+          if (payload.eventType === 'INSERT') {
+            setItems(prev => [...prev, payload.new as Item]);
+          } else if (payload.eventType === 'UPDATE') {
+            setItems(prev => 
+              prev.map(item => 
+                item.id === payload.new.id ? payload.new as Item : item
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setItems(prev => 
+              prev.filter(item => item.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to board_columns changes
+    const columnsChannel = supabase
+      .channel('board_columns_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'board_columns',
+          filter: `board_id=eq.${boardId}`
+        },
+        (payload) => {
+          console.log('Real-time board_columns change:', payload);
+          if (payload.eventType === 'INSERT') {
+            const newColumn = { ...payload.new, options: Array.isArray(payload.new.options) ? payload.new.options as string[] : null } as Column;
+            setColumns(prev => [...prev, newColumn]);
+          } else if (payload.eventType === 'UPDATE') {
+            setColumns(prev => 
+              prev.map(col => 
+                col.id === payload.new.id 
+                  ? { ...payload.new, options: Array.isArray(payload.new.options) ? payload.new.options as string[] : null } as Column 
+                  : col
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setColumns(prev => 
+              prev.filter(col => col.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+  };
 
   const fetchBoardData = async () => {
     setLoading(true);
     console.log('Fetching board data for boardId:', boardId);
 
     try {
-      // Fetch columns from board_columns table
+      // Fetch columns
       const { data: columnsData, error: columnsError } = await supabase
         .from('board_columns')
         .select('*')
@@ -73,7 +172,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      // Fetch items from board_items table
+      // Fetch items
       const { data: itemsData, error: itemsError } = await supabase
         .from('board_items')
         .select('*')
@@ -85,19 +184,27 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      // Fetch item values
-      const { data: valuesData, error: valuesError } = await supabase
-        .from('item_values')
-        .select('*');
+      // Fetch all item values for this board's items
+      const itemIds = (itemsData || []).map(item => item.id);
+      let valuesData: ItemValue[] = [];
+      
+      if (itemIds.length > 0) {
+        const { data: fetchedValues, error: valuesError } = await supabase
+          .from('item_values')
+          .select('*')
+          .in('item_id', itemIds);
 
-      if (valuesError) {
-        console.error('Error fetching item values:', valuesError);
-        return;
+        if (valuesError) {
+          console.error('Error fetching item values:', valuesError);
+          return;
+        }
+        
+        valuesData = fetchedValues || [];
       }
 
       console.log('Fetched data:', { columnsData, itemsData, valuesData });
       
-      // Transform columns data to match our interface
+      // Transform columns data
       const transformedColumns: Column[] = (columnsData || []).map(col => ({
         ...col,
         options: Array.isArray(col.options) ? col.options as string[] : null
@@ -105,7 +212,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       
       setColumns(transformedColumns);
       setItems(itemsData || []);
-      setItemValues(valuesData || []);
+      setItemValues(valuesData);
     } catch (error) {
       console.error('Unexpected error fetching board data:', error);
     } finally {
@@ -118,7 +225,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       (value) => value.item_id === itemId && value.column_id === columnId
     );
     
-    if (!itemValue) return '';
+    if (!itemValue) return getDefaultValue(column);
     
     // Return appropriate value based on column type
     switch (column.type) {
@@ -136,6 +243,21 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         }
       default:
         return itemValue.value || '';
+    }
+  };
+
+  const getDefaultValue = (column: Column): any => {
+    switch (column.type) {
+      case 'date-range':
+        return { start: '', end: '' };
+      case 'number':
+        return '';
+      case 'date':
+      case 'timestamp':
+      case 'last updated':
+        return '';
+      default:
+        return '';
     }
   };
 
@@ -267,15 +389,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       console.log('Successfully updated item value:', data);
-
-      if (data && data[0]) {
-        setItemValues((prev) => {
-          const rest = prev.filter(
-            (v) => !(v.item_id === itemId && v.column_id === columnId)
-          );
-          return [...rest, data[0]];
-        });
-      }
+      // Real-time subscription will handle updating the state
     } catch (error) {
       console.error('Unexpected error updating item value:', error);
     }
@@ -325,9 +439,8 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      if (data) {
-        setItemValues(prev => [...prev, ...data]);
-      }
+      console.log('Created default item values:', data);
+      // Real-time subscription will handle updating the state
     }
   };
 
@@ -354,7 +467,6 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       if (data && data[0]) {
-        setItems(prev => [...prev, ...data]);
         setNewItemName('');
         
         // Create default values for all columns
@@ -373,13 +485,21 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
     try {
       const nextOrder = columns.length > 0 ? Math.max(...columns.map(col => col.order || 0)) + 1 : 1;
 
+      let options = null;
+      if (newColumnType === 'status') {
+        options = ["Not started", "Working on it", "Stuck", "Done"];
+      } else if (newColumnType === 'priority') {
+        options = ["Low", "Medium", "High"];
+      }
+
       const { data, error } = await supabase
         .from('board_columns')
         .insert([{ 
           name: newColumnName, 
           type: newColumnType, 
           board_id: boardId,
-          order: nextOrder
+          order: nextOrder,
+          options: options
         }])
         .select();
 
@@ -389,15 +509,9 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       }
 
       if (data) {
-        // Transform the new column data to match our interface
-        const transformedNewColumns: Column[] = data.map(col => ({
-          ...col,
-          options: Array.isArray(col.options) ? col.options as string[] : null
-        }));
-        
-        setColumns(prev => [...prev, ...transformedNewColumns]);
         setNewColumnName('');
         setNewColumnType('text');
+        // Real-time subscription will handle updating the state
       }
     } catch (error) {
       console.error('Unexpected error adding column:', error);
@@ -534,7 +648,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
         {items.length === 0 && columns.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            <p>No columns or items yet. Create a new board to see the default columns!</p>
+            <p>No columns or items yet. Create your first column and item to get started!</p>
           </div>
         )}
       </CardContent>
