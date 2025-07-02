@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,8 +73,8 @@ const AcceptInvitation = () => {
         return;
       }
 
-      // Cast the Json response to our expected type
-      const response = data as AcceptInvitationResponse;
+      // Safely cast the Json response to our expected type
+      const response = data as unknown as AcceptInvitationResponse;
 
       if (response?.success) {
         setAccepted(true);
