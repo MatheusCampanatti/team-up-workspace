@@ -13,13 +13,6 @@ interface AccessCodeEntryProps {
   onCodeValidated?: (companyId: string, role: string) => void;
 }
 
-interface ValidationResponse {
-  success: boolean;
-  company_id?: string;
-  role?: string;
-  error?: string;
-}
-
 const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) => {
   const [accessCode, setAccessCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,39 +25,30 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
 
     setLoading(true);
     try {
-      console.log('Validating access code:', accessCode.trim().toUpperCase());
+      console.log('Checking access code:', accessCode.trim().toUpperCase());
       
-      const { data, error } = await supabase.rpc('validate_access_code', {
-        code: accessCode.trim().toUpperCase()
-      });
+      // Check if the access code exists in the company_invitations table
+      const { data, error } = await supabase
+        .from('company_invitations')
+        .select('*')
+        .eq('access_code', accessCode.trim().toUpperCase())
+        .single();
 
       if (error) {
-        console.error('RPC call error:', error);
-        throw error;
-      }
-
-      console.log('Validation response:', data);
-
-      // Handle the response with proper type conversion
-      const result = data as ValidationResponse;
-
-      if (result.success && result.company_id && result.role) {
-        toast({
-          title: 'Success!',
-          description: `Access code validated successfully. Redirecting to company workspace...`
-        });
-        
-        // Navigate to the company boards page
-        navigate(`/company/${result.company_id}/boards`);
-        
-        if (onCodeValidated) {
-          onCodeValidated(result.company_id, result.role);
-        }
-      } else {
+        console.error('Error checking access code:', error);
         toast({
           title: 'Invalid Code',
-          description: result.error || 'Invalid or already used code',
+          description: 'Access code not found',
           variant: 'destructive'
+        });
+        return;
+      }
+
+      if (data) {
+        console.log('Access code found:', data);
+        toast({
+          title: 'Success!',
+          description: 'Code found'
         });
       }
     } catch (error: any) {
