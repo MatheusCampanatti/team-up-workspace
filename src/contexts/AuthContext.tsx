@@ -51,66 +51,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, name: string) => {
     console.log('Starting sign up process for:', email);
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: name,
-          full_name: name
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+            full_name: name
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Sign up error:', error);
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.message?.includes('User already registered')) {
+          return { error: { ...error, message: 'An account with this email already exists. Please try signing in instead.' } };
+        }
+        if (error.message?.includes('email_address_invalid')) {
+          return { error: { ...error, message: 'Please enter a valid email address.' } };
+        }
+        if (error.message?.includes('Password should be')) {
+          return { error: { ...error, message: 'Password must be at least 6 characters long.' } };
+        }
+        if (error.message?.includes('Signup is disabled')) {
+          return { error: { ...error, message: 'Account registration is currently disabled. Please contact support.' } };
+        }
+        
+        return { error };
+      }
+
+      if (data.user) {
+        console.log('Sign up completed successfully for:', email);
+        // The profile will be automatically created by the database trigger
+        
+        // If the user is immediately confirmed (no email verification), 
+        // they'll be signed in automatically
+        if (data.session) {
+          console.log('User is immediately signed in');
         }
       }
-    });
-    
-    if (error) {
-      console.error('Sign up error:', error);
       
-      // Handle specific error cases with user-friendly messages
-      if (error.message?.includes('User already registered')) {
-        return { error: { ...error, message: 'An account with this email already exists. Please try signing in instead.' } };
-      }
-      if (error.message?.includes('email_address_invalid')) {
-        return { error: { ...error, message: 'Please enter a valid email address.' } };
-      }
-      if (error.message?.includes('Password should be')) {
-        return { error: { ...error, message: 'Password must be at least 6 characters long.' } };
-      }
-      if (error.message?.includes('Signup is disabled')) {
-        return { error: { ...error, message: 'Account registration is currently disabled. Please contact support.' } };
-      }
-    } else {
-      console.log('Sign up completed successfully for:', email);
+      return { error: null };
+    } catch (err: any) {
+      console.error('Unexpected sign up error:', err);
+      return { error: { message: err.message || 'An unexpected error occurred during sign up' } };
     }
-    
-    return { error };
   };
 
   const signIn = async (email: string, password: string) => {
     console.log('Starting sign in process for:', email);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    if (error) {
-      console.error('Sign in error:', error);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      // Handle specific error cases with user-friendly messages
-      if (error.message?.includes('Invalid login credentials')) {
-        return { error: { ...error, message: 'Invalid email or password. Please check your credentials and try again.' } };
+      if (error) {
+        console.error('Sign in error:', error);
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.message?.includes('Invalid login credentials')) {
+          return { error: { ...error, message: 'Invalid email or password. Please check your credentials and try again.' } };
+        }
+        if (error.message?.includes('Email not confirmed')) {
+          return { error: { ...error, message: 'Please check your email to confirm your account before signing in.' } };
+        }
+        if (error.message?.includes('Too many requests')) {
+          return { error: { ...error, message: 'Too many login attempts. Please wait a moment before trying again.' } };
+        }
+        
+        return { error };
       }
-      if (error.message?.includes('Email not confirmed')) {
-        return { error: { ...error, message: 'Please check your email to confirm your account before signing in.' } };
+
+      if (data.user) {
+        console.log('Sign in successful for:', email);
+        
+        // Verify that the user has a profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (profileError && profileError.code === 'PGRST116') {
+          // Profile doesn't exist, create it
+          console.log('Creating missing profile for user:', data.user.id);
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: data.user.id,
+                email: data.user.email || '',
+                name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || 'User'
+              }
+            ]);
+            
+          if (createError) {
+            console.error('Error creating profile:', createError);
+          }
+        }
       }
-      if (error.message?.includes('Too many requests')) {
-        return { error: { ...error, message: 'Too many login attempts. Please wait a moment before trying again.' } };
-      }
-    } else {
-      console.log('Sign in successful for:', email);
+      
+      return { error: null };
+    } catch (err: any) {
+      console.error('Unexpected sign in error:', err);
+      return { error: { message: err.message || 'An unexpected error occurred during sign in' } };
     }
-    
-    return { error };
   };
 
   const signOut = async () => {
