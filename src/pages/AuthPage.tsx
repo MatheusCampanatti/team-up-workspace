@@ -7,22 +7,32 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
-import ProfileDebugger from '@/components/ProfileDebugger';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const AuthPage = () => {
   const { user, signIn, signUp, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Form states
-  const [signInEmail, setSignInEmail] = useState('');
-  const [signInPassword, setSignInPassword] = useState('');
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [signUpName, setSignUpName] = useState('');
+  // Form states for Sign In
+  const [signInData, setSignInData] = useState({
+    email: '',
+    password: ''
+  });
+
+  // Form states for Sign Up
+  const [signUpData, setSignUpData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
 
   useEffect(() => {
     if (user && !loading) {
@@ -30,22 +40,45 @@ const AuthPage = () => {
     }
   }, [user, loading, navigate]);
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string) => {
+    return password.length >= 6;
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
-    setSuccess(null);
+
+    // Validation
+    if (!validateEmail(signInData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (!signInData.password) {
+      setError('Password is required');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      const { error } = await signIn(signInEmail, signInPassword);
+      const { error } = await signIn(signInData.email, signInData.password);
       if (error) {
         setError(error.message);
       } else {
-        setSuccess('Sign in successful! Redirecting...');
-        setTimeout(() => navigate('/dashboard'), 1500);
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully signed in.",
+        });
+        navigate('/dashboard');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during sign in');
+      setError(err.message || 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
     }
@@ -53,23 +86,48 @@ const AuthPage = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
-    setSuccess(null);
+
+    // Validation
+    if (!signUpData.name.trim()) {
+      setError('Name is required');
+      return;
+    }
+
+    if (!validateEmail(signUpData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (!validatePassword(signUpData.password)) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (signUpData.password !== signUpData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      const { error } = await signUp(signUpEmail, signUpPassword, signUpName);
+      const { error } = await signUp(signUpData.email, signUpData.password, signUpData.name);
       if (error) {
         setError(error.message);
       } else {
-        setSuccess('Account created successfully! You can now sign in.');
-        // Reset form
-        setSignUpEmail('');
-        setSignUpPassword('');
-        setSignUpName('');
+        toast({
+          title: "Account created successfully!",
+          description: "You can now sign in with your credentials.",
+        });
+        // Reset form and switch to sign in tab
+        setSignUpData({ name: '', email: '', password: '', confirmPassword: '' });
+        // Auto-switch to sign in tab
+        const signInTab = document.querySelector('[value="signin"]') as HTMLElement;
+        signInTab?.click();
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during sign up');
+      setError(err.message || 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
     }
@@ -77,8 +135,11 @@ const AuthPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </div>
     );
   }
@@ -94,12 +155,6 @@ const AuthPage = () => {
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert className="border-green-200 bg-green-50">
-            <AlertDescription className="text-green-800">{success}</AlertDescription>
           </Alert>
         )}
 
@@ -121,21 +176,32 @@ const AuthPage = () => {
                     <Input
                       type="email"
                       placeholder="Email"
-                      value={signInEmail}
-                      onChange={(e) => setSignInEmail(e.target.value)}
-                      required
+                      value={signInData.email}
+                      onChange={(e) => setSignInData(prev => ({ ...prev, email: e.target.value }))}
                       disabled={isSubmitting}
+                      required
                     />
                   </div>
-                  <div>
+                  <div className="relative">
                     <Input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
-                      value={signInPassword}
-                      onChange={(e) => setSignInPassword(e.target.value)}
-                      required
+                      value={signInData.password}
+                      onChange={(e) => setSignInData(prev => ({ ...prev, password: e.target.value }))}
                       disabled={isSubmitting}
+                      required
                     />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
                   </div>
                 </CardContent>
                 <CardFooter>
@@ -168,33 +234,69 @@ const AuthPage = () => {
                     <Input
                       type="text"
                       placeholder="Full Name"
-                      value={signUpName}
-                      onChange={(e) => setSignUpName(e.target.value)}
-                      required
+                      value={signUpData.name}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, name: e.target.value }))}
                       disabled={isSubmitting}
+                      required
                     />
                   </div>
                   <div>
                     <Input
                       type="email"
                       placeholder="Email"
-                      value={signUpEmail}
-                      onChange={(e) => setSignUpEmail(e.target.value)}
-                      required
+                      value={signUpData.email}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, email: e.target.value }))}
                       disabled={isSubmitting}
+                      required
                     />
                   </div>
-                  <div>
+                  <div className="relative">
                     <Input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
-                      value={signUpPassword}
-                      onChange={(e) => setSignUpPassword(e.target.value)}
-                      required
+                      value={signUpData.password}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
                       disabled={isSubmitting}
+                      required
                       minLength={6}
                     />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
                   </div>
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm Password"
+                      value={signUpData.confirmPassword}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      disabled={isSubmitting}
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Password must be at least 6 characters long
+                  </p>
                 </CardContent>
                 <CardFooter>
                   <Button 
@@ -216,12 +318,6 @@ const AuthPage = () => {
             </TabsContent>
           </Tabs>
         </Card>
-
-        {user && (
-          <div className="mt-6">
-            <ProfileDebugger />
-          </div>
-        )}
       </div>
     </div>
   );

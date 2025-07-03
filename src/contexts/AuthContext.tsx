@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
@@ -22,26 +22,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Clean up auth state utility
-const cleanupAuthState = () => {
-  // Remove standard auth tokens
-  localStorage.removeItem('supabase.auth.token');
-  
-  // Remove all Supabase auth keys from localStorage
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      localStorage.removeItem(key);
-    }
-  });
-  
-  // Remove from sessionStorage if in use
-  Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      sessionStorage.removeItem(key);
-    }
-  });
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -50,25 +30,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event: AuthChangeEvent, session) => {
+      (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-        
-        // Log different auth events for debugging
-        if (event === 'SIGNED_UP') {
-          console.log('User signed up successfully');
-        }
-        if (event === 'SIGNED_IN') {
-          console.log('User signed in successfully');
-        }
-        if (event === 'SIGNED_OUT') {
-          console.log('User signed out successfully');
-        }
-        if (event === 'TOKEN_REFRESHED') {
-          console.log('Auth token refreshed');
-        }
       }
     );
 
@@ -85,15 +51,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, name: string) => {
     console.log('Starting sign up process for:', email);
     
-    // Clean up existing state before signing up
-    cleanupAuthState();
-    
-    try {
-      await supabase.auth.signOut({ scope: 'global' });
-    } catch (err) {
-      console.log('Cleanup sign out completed');
-    }
-
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -108,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) {
       console.error('Sign up error:', error);
       
-      // Handle specific error cases
+      // Handle specific error cases with user-friendly messages
       if (error.message?.includes('User already registered')) {
         return { error: { ...error, message: 'An account with this email already exists. Please try signing in instead.' } };
       }
@@ -117,6 +74,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       if (error.message?.includes('Password should be')) {
         return { error: { ...error, message: 'Password must be at least 6 characters long.' } };
+      }
+      if (error.message?.includes('Signup is disabled')) {
+        return { error: { ...error, message: 'Account registration is currently disabled. Please contact support.' } };
       }
     } else {
       console.log('Sign up completed successfully for:', email);
@@ -127,15 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     console.log('Starting sign in process for:', email);
-    
-    // Clean up existing state before signing in
-    cleanupAuthState();
-    
-    try {
-      await supabase.auth.signOut({ scope: 'global' });
-    } catch (err) {
-      console.log('Cleanup sign out completed');
-    }
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -145,36 +96,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) {
       console.error('Sign in error:', error);
       
-      // Handle specific error cases
+      // Handle specific error cases with user-friendly messages
       if (error.message?.includes('Invalid login credentials')) {
         return { error: { ...error, message: 'Invalid email or password. Please check your credentials and try again.' } };
       }
       if (error.message?.includes('Email not confirmed')) {
         return { error: { ...error, message: 'Please check your email to confirm your account before signing in.' } };
       }
+      if (error.message?.includes('Too many requests')) {
+        return { error: { ...error, message: 'Too many login attempts. Please wait a moment before trying again.' } };
+      }
+    } else {
+      console.log('Sign in successful for:', email);
     }
     
     return { error };
   };
 
   const signOut = async () => {
+    console.log('Starting sign out process');
+    
     try {
-      // Clean up auth state first
-      cleanupAuthState();
-      
-      // Attempt global sign out
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-      } catch (err) {
-        console.log('Sign out error (ignored):', err);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+      } else {
+        console.log('Sign out successful');
+        // Clear local state
+        setUser(null);
+        setSession(null);
       }
-      
-      // Force page reload for a clean state
-      window.location.href = '/auth';
     } catch (error) {
       console.error('Sign out error:', error);
-      // Force redirect even if there's an error
-      window.location.href = '/auth';
     }
   };
 

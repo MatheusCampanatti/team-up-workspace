@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AcceptInvitation from '@/components/AcceptInvitation';
 import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -25,11 +26,27 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/company/:companyId/boards" element={<CompanyBoardsPage />} />
-            <Route path="/board/:boardId" element={<BoardPage />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/company/:companyId/boards" element={
+              <ProtectedRoute>
+                <CompanyBoardsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/board/:boardId" element={
+              <ProtectedRoute>
+                <BoardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/accept" element={
+              <ProtectedRoute>
+                <AcceptInvitation />
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
-            <Route path="/accept" element={<AcceptInvitation />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
