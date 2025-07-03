@@ -47,7 +47,7 @@ const CompanyBoardsPage = () => {
     
     fetchCompanyAndBoards();
   }, [user, companyId, navigate]);
-  
+
   const fetchCompanyAndBoards = async () => {
     if (!companyId) return;
     
