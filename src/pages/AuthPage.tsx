@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, Mail, Lock, User, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import ProfileDebugger from '@/components/ProfileDebugger';
 
 const AuthPage = () => {
   const { user, signIn, signUp, resendVerification, loading: authLoading } = useAuth();
@@ -20,6 +20,7 @@ const AuthPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showVerificationMessage, setShowVerificationMessage] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -79,7 +80,6 @@ const AuthPage = () => {
         break;
       case 'password':
         errors.password = validatePassword(value) ? '' : 'Password must be at least 6 characters';
-        // Also check confirm password if it exists
         if (signUpData.confirmPassword) {
           errors.confirmPassword = value === signUpData.confirmPassword ? '' : 'Passwords do not match';
         }
@@ -147,7 +147,6 @@ const AuthPage = () => {
     
     setValidationErrors(errors);
     
-    // Check if there are any validation errors
     if (Object.values(errors).some(error => error !== '')) {
       toast({
         title: 'Validation Error',
@@ -251,220 +250,239 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-2xl font-bold text-gray-900">Welcome</CardTitle>
-          <CardDescription className="text-gray-600">
-            Sign in to your account or create a new one to get started
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {showVerificationMessage && (
-            <Alert className="mb-6 border-amber-200 bg-amber-50">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                <div className="space-y-2">
-                  <p className="font-medium">Email verification required</p>
-                  <p className="text-sm">
-                    We've sent a verification link to <strong>{verificationEmail}</strong>. 
-                    Please check your email and click the link to verify your account.
-                  </p>
-                  <Button
-                    onClick={handleResendVerification}
-                    variant="outline"
-                    size="sm"
-                    disabled={isLoading}
-                    className="mt-2 h-8 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="mr-1 h-3 w-3" />
-                    )}
-                    Resend verification email
-                  </Button>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+      <div className="w-full max-w-4xl flex gap-6">
+        <Card className="flex-1 shadow-xl">
+          <CardHeader className="text-center space-y-2">
+            <CardTitle className="text-2xl font-bold text-gray-900">Welcome</CardTitle>
+            <CardDescription className="text-gray-600">
+              Sign in to your account or create a new one to get started
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {showVerificationMessage && (
+              <Alert className="mb-6 border-amber-200 bg-amber-50">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  <div className="space-y-2">
+                    <p className="font-medium">Email verification required</p>
+                    <p className="text-sm">
+                      We've sent a verification link to <strong>{verificationEmail}</strong>. 
+                      Please check your email and click the link to verify your account.
+                    </p>
+                    <Button
+                      onClick={handleResendVerification}
+                      variant="outline"
+                      size="sm"
+                      disabled={isLoading}
+                      className="mt-2 h-8 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-1 h-3 w-3" />
+                      )}
+                      Resend verification email
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
 
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="signin" className="text-sm">Sign In</TabsTrigger>
-              <TabsTrigger value="signup" className="text-sm">Sign Up</TabsTrigger>
-            </TabsList>
+            <Tabs defaultValue="signin" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="signin" className="text-sm">Sign In</TabsTrigger>
+                <TabsTrigger value="signup" className="text-sm">Sign Up</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signin" className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email" className="text-sm font-medium">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={signInData.email}
+                        onChange={(e) => handleSignInChange('email', e.target.value)}
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signin-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={signInData.password}
+                        onChange={(e) => handleSignInChange('password', e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                        disabled={isLoading}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isLoading || !signInData.email || !signInData.password}
+                  >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Sign In
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="signup" className="space-y-4">
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-name" className="text-sm font-medium">Full Name</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-name"
+                        type="text"
+                        placeholder="Enter your full name"
+                        value={signUpData.name}
+                        onChange={(e) => handleSignUpChange('name', e.target.value)}
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
+                    {validationErrors.name && (
+                      <p className="text-sm text-red-500 mt-1">{validationErrors.name}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email" className="text-sm font-medium">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={signUpData.email}
+                        onChange={(e) => handleSignUpChange('email', e.target.value)}
+                        className="pl-10"
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
+                    {validationErrors.email && (
+                      <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Create a strong password"
+                        value={signUpData.password}
+                        onChange={(e) => handleSignUpChange('password', e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                        disabled={isLoading}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {validationErrors.password && (
+                      <p className="text-sm text-red-500 mt-1">{validationErrors.password}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm-password" className="text-sm font-medium">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-confirm-password"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirm your password"
+                        value={signUpData.confirmPassword}
+                        onChange={(e) => handleSignUpChange('confirmPassword', e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                        disabled={isLoading}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {validationErrors.confirmPassword && (
+                      <p className="text-sm text-red-500 mt-1">{validationErrors.confirmPassword}</p>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isLoading || !isSignUpValid}
+                  >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Create Account
+                  </Button>
+                  
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 mt-4">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>Email verification required after signup</span>
+                  </div>
+                </form>
+              </TabsContent>
+            </Tabs>
             
-            <TabsContent value="signin" className="space-y-4">
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="text-sm font-medium">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={signInData.email}
-                      onChange={(e) => handleSignInChange('email', e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signin-password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={signInData.password}
-                      onChange={(e) => handleSignInChange('password', e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                      disabled={isLoading}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading || !signInData.email || !signInData.password}
-                >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Sign In
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup" className="space-y-4">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="text-sm font-medium">Full Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={signUpData.name}
-                      onChange={(e) => handleSignUpChange('name', e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  {validationErrors.name && (
-                    <p className="text-sm text-red-500 mt-1">{validationErrors.name}</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="text-sm font-medium">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={signUpData.email}
-                      onChange={(e) => handleSignUpChange('email', e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  {validationErrors.email && (
-                    <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signup-password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Create a strong password"
-                      value={signUpData.password}
-                      onChange={(e) => handleSignUpChange('password', e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                      disabled={isLoading}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {validationErrors.password && (
-                    <p className="text-sm text-red-500 mt-1">{validationErrors.password}</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="signup-confirm-password" className="text-sm font-medium">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signup-confirm-password"
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
-                      value={signUpData.confirmPassword}
-                      onChange={(e) => handleSignUpChange('confirmPassword', e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                      disabled={isLoading}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {validationErrors.confirmPassword && (
-                    <p className="text-sm text-red-500 mt-1">{validationErrors.confirmPassword}</p>
-                  )}
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading || !isSignUpValid}
-                >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Account
-                </Button>
-                
-                <div className="flex items-center space-x-2 text-sm text-gray-600 mt-4">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <span>Email verification required after signup</span>
-                </div>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            <div className="mt-6">
+              <Button
+                onClick={() => setShowDebugInfo(!showDebugInfo)}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                {showDebugInfo ? 'Hide' : 'Show'} Debug Info
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {showDebugInfo && (
+          <div className="w-80">
+            <ProfileDebugger />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

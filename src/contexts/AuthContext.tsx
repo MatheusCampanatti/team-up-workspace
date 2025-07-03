@@ -144,36 +144,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('Resending verification email to:', email);
     
     try {
-      // First try Supabase's built-in resend
-      const { error: supabaseError } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`
+      // First try using our custom email service
+      const response = await supabase.functions.invoke('send-verification-email', {
+        body: { 
+          email: email,
+          redirectTo: `${window.location.origin}/dashboard`
         }
       });
       
-      if (supabaseError) {
-        console.error('Supabase resend error:', supabaseError);
-        // If Supabase fails, try our custom email service
-        const response = await fetch('/api/resend-verification', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email })
+      if (response.error) {
+        console.error('Custom email service error:', response.error);
+        
+        // Fallback to Supabase's built-in resend
+        const { error: supabaseError } = await supabase.auth.resend({
+          type: 'signup',
+          email: email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`
+          }
         });
         
-        if (!response.ok) {
-          throw new Error('Failed to resend verification email');
+        if (supabaseError) {
+          console.error('Supabase resend error:', supabaseError);
+          return { error: supabaseError };
         }
-        
-        console.log('Verification email resent via custom service');
-        return { error: null };
-      } else {
-        console.log('Verification email resent successfully via Supabase');
-        return { error: null };
       }
+      
+      console.log('Verification email resent successfully');
+      return { error: null };
     } catch (error) {
       console.error('Resend verification error:', error);
       return { error };
