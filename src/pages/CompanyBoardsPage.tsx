@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
 import AccessCodeGenerator from '@/components/AccessCodeGenerator';
-import PendingAccessCodes from '@/components/PendingAccessCodes';
 import CompanyUsers from '@/components/CompanyUsers';
 
 interface Board {
@@ -181,7 +181,7 @@ const CompanyBoardsPage = () => {
                 <h1 className="text-xl font-semibold text-gray-900">
                   {company?.name || 'Loading...'}
                 </h1>
-                <p className="text-sm text-gray-600">Boards</p>
+                <p className="text-sm text-gray-600">Company Workspace</p>
               </div>
             </div>
           </div>
@@ -190,6 +190,22 @@ const CompanyBoardsPage = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Team Management Section */}
+        {companyId && company && (
+          <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AccessCodeGenerator 
+              companyId={companyId} 
+              onCodeGenerated={() => {
+                console.log('Access code generated, refreshing...');
+              }}
+            />
+            <CompanyUsers 
+              companyId={companyId} 
+              companyName={company.name}
+            />
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Boards</h2>
@@ -238,31 +254,6 @@ const CompanyBoardsPage = () => {
             </DialogContent>
           </Dialog>
         </div>
-
-        {/* Team Management Section - Access Code System */}
-        {companyId && company && (
-          <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AccessCodeGenerator 
-              companyId={companyId} 
-              onCodeGenerated={() => {
-                console.log('Access code generated, refreshing...');
-              }}
-            />
-            <PendingAccessCodes 
-              companyId={companyId} 
-            />
-          </div>
-        )}
-
-        {/* Company Users Section */}
-        {companyId && company && (
-          <div className="mb-8">
-            <CompanyUsers 
-              companyId={companyId} 
-              companyName={company.name}
-            />
-          </div>
-        )}
 
         {/* Boards Grid */}
         {loading ? (
