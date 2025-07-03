@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -46,12 +45,12 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       
       console.log('Sample emails in profiles table:', allProfiles);
       
-      // Query the profiles table with case-insensitive email matching
+      // Query the profiles table - id column is the user identifier
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, name')
         .eq('email', userEmail.trim().toLowerCase())
-        .maybeSingle(); // Use maybeSingle instead of single to avoid error when no rows found
+        .maybeSingle();
 
       console.log('Profile query result:', { profiles, profileError });
 
@@ -82,7 +81,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       const { data: existingRole, error: roleCheckError } = await supabase
         .from('user_company_roles')
         .select('role')
-        .eq('user_id', profiles.id)
+        .eq('user_id', profiles.id) // profiles.id is the user identifier
         .eq('company_id', companyId)
         .maybeSingle();
 
@@ -101,7 +100,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       const { data: existingInvitation, error: invitationCheckError } = await supabase
         .from('company_invitations')
         .select('access_code')
-        .eq('user_id', profiles.id)
+        .eq('user_id', profiles.id) // profiles.id is the user identifier
         .eq('company_id', companyId)
         .eq('validated', false)
         .maybeSingle();
@@ -126,7 +125,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
         .from('company_invitations')
         .insert([{
           company_id: companyId,
-          user_id: profiles.id,
+          user_id: profiles.id, // profiles.id is the user identifier
           access_code: accessCode,
           role: selectedRole,
           status: 'pending',
