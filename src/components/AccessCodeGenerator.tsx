@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,11 +14,9 @@ interface AccessCodeGeneratorProps {
 }
 
 const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, onCodeGenerated }) => {
-  const [userEmail, setUserEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState('Member');
   const [loading, setLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  const [foundUser, setFoundUser] = useState<{ id: string; email: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
@@ -30,97 +27,41 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
     return Array.from(array, byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('');
   };
 
-  const generateAccessCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userEmail.trim()) return;
-
+  const generateAccessCode = async () => {
     setLoading(true);
-    const emailToSearch = userEmail.trim().toLowerCase();
-    console.log('Searching for user with email:', emailToSearch);
+    console.log('Generating access code for company:', companyId);
     
     try {
-      // Query the profiles table - check if email exists (case insensitive)
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email, name')
-        .ilike('email', emailToSearch)
-        .maybeSingle();
-
-      console.log('Profile query result:', { profiles, profileError });
-
-      if (profileError) {
-        console.error('Database error:', profileError);
-        toast({
-          title: 'Database error',
-          description: 'There was an error checking the user email. Please try again.',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      if (!profiles) {
-        console.log('No user found with email:', emailToSearch);
-        toast({
-          title: 'Email not registered',
-          description: 'Please ensure the email is correct and the user has registered on the platform.',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      console.log('Found user:', profiles);
-      setFoundUser(profiles);
-
-      // Check if user already belongs to this company
-      const { data: existingRole, error: roleCheckError } = await supabase
-        .from('user_company_roles')
-        .select('role')
-        .eq('user_id', profiles.id)
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-      console.log('Existing role check:', { existingRole, roleCheckError });
-
-      if (existingRole) {
-        toast({
-          title: 'User already in company',
-          description: `This user is already a ${existingRole.role} in your company.`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Check if there's already a pending access code for this user
-      const { data: existingInvitation, error: invitationCheckError } = await supabase
-        .from('company_invitations')
-        .select('access_code')
-        .eq('user_id', profiles.id)
-        .eq('company_id', companyId)
-        .eq('validated', false)
-        .maybeSingle();
-
-      console.log('Existing invitation check:', { existingInvitation, invitationCheckError });
-
-      if (existingInvitation) {
-        toast({
-          title: 'Code already exists',
-          description: `There's already a pending access code for this user: ${existingInvitation.access_code}`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
       // Generate secure random access code
       const accessCode = generateSecureAccessCode();
       console.log('Generated access code:', accessCode);
+
+      // Check if this access code already exists (very unlikely but good to check)
+      const { data: existingCode, error: checkError } = await supabase
+        .from('company_invitations')
+        .select('access_code')
+        .eq('access_code', accessCode)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing access code:', checkError);
+        throw checkError;
+      }
+
+      if (existingCode) {
+        // Extremely unlikely, but regenerate if code exists
+        console.log('Access code already exists, regenerating...');
+        generateAccessCode(); // Retry
+        return;
+      }
 
       // Insert the invitation with all required columns
       const { error: insertError } = await supabase
         .from('company_invitations')
         .insert([{
           company_id: companyId,
-          user_id: profiles.id,
-          email: profiles.email,
+          user_id: null, // Not tied to a specific user
+          email: '', // Not tied to a specific email
           access_code: accessCode,
           role: selectedRole,
           status: 'pending',
@@ -137,7 +78,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       setGeneratedCode(accessCode);
       toast({
         title: 'Access code generated!',
-        description: `Access code created for ${profiles.name || profiles.email}.`
+        description: `Access code created for ${selectedRole} role.`
       });
 
       if (onCodeGenerated) {
@@ -168,10 +109,8 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
   };
 
   const resetForm = () => {
-    setUserEmail('');
     setSelectedRole('Member');
     setGeneratedCode(null);
-    setFoundUser(null);
     setCopied(false);
   };
 
@@ -180,7 +119,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       <CardHeader>
         <CardTitle>Generate Access Code</CardTitle>
         <CardDescription>
-          Create a unique access code for a specific user to join your company
+          Create a unique access code that anyone can use to join your company
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -188,13 +127,10 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
           <div className="space-y-4">
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h3 className="font-medium text-green-900 mb-2">Access Code Generated!</h3>
-              {foundUser && (
-                <div className="mb-3 text-sm text-green-800">
-                  <p><strong>User:</strong> {foundUser.name || 'N/A'}</p>
-                  <p><strong>Email:</strong> {foundUser.email}</p>
-                  <p><strong>Role:</strong> {selectedRole}</p>
-                </div>
-              )}
+              <div className="mb-3 text-sm text-green-800">
+                <p><strong>Role:</strong> {selectedRole}</p>
+                <p><strong>Usage:</strong> Anyone can use this code to join the company</p>
+              </div>
               <div className="flex items-center space-x-2">
                 <code className="bg-white px-3 py-2 rounded border font-mono text-lg tracking-wider">
                   {generatedCode}
@@ -209,7 +145,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
                 </Button>
               </div>
               <p className="text-sm text-green-700 mt-2">
-                Share this code with the user so they can join your company.
+                Share this code with anyone you want to join your company with {selectedRole} role.
               </p>
             </div>
             <Button onClick={resetForm} variant="outline" className="w-full">
@@ -217,21 +153,9 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
             </Button>
           </div>
         ) : (
-          <form onSubmit={generateAccessCode} className="space-y-4">
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="user-email">User Email</Label>
-              <Input
-                id="user-email"
-                type="email"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                placeholder="Enter user's email address"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="role">Role</Label>
+              <Label htmlFor="role">Role for new members</Label>
               <Select value={selectedRole} onValueChange={setSelectedRole}>
                 <SelectTrigger>
                   <SelectValue />
@@ -244,7 +168,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
               </Select>
             </div>
 
-            <Button type="submit" disabled={loading || !userEmail.trim()} className="w-full">
+            <Button onClick={generateAccessCode} disabled={loading} className="w-full">
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -254,7 +178,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
                 'Generate Access Code'
               )}
             </Button>
-          </form>
+          </div>
         )}
       </CardContent>
     </Card>
