@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  resendVerification: (email: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,13 +59,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Log different auth events for debugging
         if (event === 'SIGNED_UP') {
-          console.log('User signed up successfully. Profile will be created by database trigger.');
+          console.log('User signed up successfully. Please check email for verification.');
         }
         if (event === 'SIGNED_IN') {
           console.log('User signed in successfully');
         }
         if (event === 'SIGNED_OUT') {
           console.log('User signed out successfully');
+        }
+        if (event === 'TOKEN_REFRESHED') {
+          console.log('Auth token refreshed');
         }
       }
     );
@@ -80,16 +84,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, name: string) => {
+    console.log('Starting sign up process for:', email);
+    
     // Clean up existing state before signing up
     cleanupAuthState();
     
     try {
       await supabase.auth.signOut({ scope: 'global' });
     } catch (err) {
-      // Continue even if this fails
+      console.log('Cleanup sign out completed');
     }
 
-    console.log('Signing up user with name:', name);
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -105,26 +110,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) {
       console.error('Sign up error:', error);
     } else {
-      console.log('Sign up successful - check email for verification');
+      console.log('Sign up initiated - verification email should be sent to:', email);
     }
     
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('Starting sign in process for:', email);
+    
     // Clean up existing state before signing in
     cleanupAuthState();
     
     try {
       await supabase.auth.signOut({ scope: 'global' });
     } catch (err) {
-      // Continue even if this fails
+      console.log('Cleanup sign out completed');
     }
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
+    
+    if (error) {
+      console.error('Sign in error:', error);
+    }
+    
+    return { error };
+  };
+
+  const resendVerification = async (email: string) => {
+    console.log('Resending verification email to:', email);
+    
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`
+      }
+    });
+    
+    if (error) {
+      console.error('Resend verification error:', error);
+    } else {
+      console.log('Verification email resent successfully');
+    }
+    
     return { error };
   };
 
@@ -137,7 +169,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await supabase.auth.signOut({ scope: 'global' });
       } catch (err) {
-        // Ignore errors
         console.log('Sign out error (ignored):', err);
       }
       
@@ -156,7 +187,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signUp,
     signIn,
-    signOut
+    signOut,
+    resendVerification
   };
 
   return (

@@ -8,15 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff, Mail, Lock, User, CheckCircle2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Mail, Lock, User, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const AuthPage = () => {
-  const { user, signIn, signUp, loading: authLoading } = useAuth();
+  const { user, signIn, signUp, resendVerification, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
   
   const [signInData, setSignInData] = useState({
     email: '',
@@ -76,6 +79,10 @@ const AuthPage = () => {
         break;
       case 'password':
         errors.password = validatePassword(value) ? '' : 'Password must be at least 6 characters';
+        // Also check confirm password if it exists
+        if (signUpData.confirmPassword) {
+          errors.confirmPassword = value === signUpData.confirmPassword ? '' : 'Passwords do not match';
+        }
         break;
       case 'confirmPassword':
         errors.confirmPassword = value === signUpData.password ? '' : 'Passwords do not match';
@@ -98,7 +105,9 @@ const AuthPage = () => {
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Invalid email or password';
         } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Please check your email and click the verification link';
+          errorMessage = 'Please verify your email address before signing in';
+          setShowVerificationMessage(true);
+          setVerificationEmail(signInData.email);
         } else if (error.message.includes('Too many requests')) {
           errorMessage = 'Too many attempts. Please try again later';
         }
@@ -170,10 +179,13 @@ const AuthPage = () => {
           variant: 'destructive'
         });
       } else {
+        setShowVerificationMessage(true);
+        setVerificationEmail(signUpData.email);
+        
         toast({
           title: 'Account Created Successfully!',
           description: 'Please check your email and click the verification link to complete your registration.',
-          duration: 6000
+          duration: 8000
         });
         
         // Clear form
@@ -188,6 +200,37 @@ const AuthPage = () => {
       toast({
         title: 'Sign Up Failed',
         description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!verificationEmail) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await resendVerification(verificationEmail);
+      
+      if (error) {
+        toast({
+          title: 'Failed to Resend',
+          description: error.message || 'Could not resend verification email',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Verification Email Sent',
+          description: 'Please check your email for the verification link.',
+          duration: 6000
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred',
         variant: 'destructive'
       });
     } finally {
@@ -216,6 +259,35 @@ const AuthPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {showVerificationMessage && (
+            <Alert className="mb-6 border-amber-200 bg-amber-50">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                <div className="space-y-2">
+                  <p className="font-medium">Email verification required</p>
+                  <p className="text-sm">
+                    We've sent a verification link to <strong>{verificationEmail}</strong>. 
+                    Please check your email and click the link to verify your account.
+                  </p>
+                  <Button
+                    onClick={handleResendVerification}
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading}
+                    className="mt-2 h-8 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-1 h-3 w-3" />
+                    )}
+                    Resend verification email
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="signin" className="text-sm">Sign In</TabsTrigger>
