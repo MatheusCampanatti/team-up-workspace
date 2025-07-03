@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event: AuthChangeEvent, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
@@ -143,21 +143,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resendVerification = async (email: string) => {
     console.log('Resending verification email to:', email);
     
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email: email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`
+    try {
+      // First try Supabase's built-in resend
+      const { error: supabaseError } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      
+      if (supabaseError) {
+        console.error('Supabase resend error:', supabaseError);
+        // If Supabase fails, try our custom email service
+        const response = await fetch('/api/resend-verification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to resend verification email');
+        }
+        
+        console.log('Verification email resent via custom service');
+        return { error: null };
+      } else {
+        console.log('Verification email resent successfully via Supabase');
+        return { error: null };
       }
-    });
-    
-    if (error) {
+    } catch (error) {
       console.error('Resend verification error:', error);
-    } else {
-      console.log('Verification email resent successfully');
+      return { error };
     }
-    
-    return { error };
   };
 
   const signOut = async () => {
