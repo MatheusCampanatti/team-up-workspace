@@ -107,6 +107,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (error) {
       console.error('Sign up error:', error);
+      
+      // Handle specific error cases
+      if (error.message?.includes('User already registered')) {
+        return { error: { ...error, message: 'An account with this email already exists. Please try signing in instead.' } };
+      }
+      if (error.message?.includes('email_address_invalid')) {
+        return { error: { ...error, message: 'Please enter a valid email address.' } };
+      }
+      if (error.message?.includes('Password should be')) {
+        return { error: { ...error, message: 'Password must be at least 6 characters long.' } };
+      }
     } else {
       console.log('Sign up completed successfully for:', email);
     }
@@ -133,6 +144,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (error) {
       console.error('Sign in error:', error);
+      
+      // Handle specific error cases
+      if (error.message?.includes('Invalid login credentials')) {
+        return { error: { ...error, message: 'Invalid email or password. Please check your credentials and try again.' } };
+      }
+      if (error.message?.includes('Email not confirmed')) {
+        return { error: { ...error, message: 'Please check your email to confirm your account before signing in.' } };
+      }
     }
     
     return { error };
