@@ -10,7 +10,6 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  resendVerification: (email: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Log different auth events for debugging
         if (event === 'SIGNED_UP') {
-          console.log('User signed up successfully. Please check email for verification.');
+          console.log('User signed up successfully');
         }
         if (event === 'SIGNED_IN') {
           console.log('User signed in successfully');
@@ -102,15 +101,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: {
           name: name,
           full_name: name
-        },
-        emailRedirectTo: `${window.location.origin}/dashboard`
+        }
       }
     });
     
     if (error) {
       console.error('Sign up error:', error);
     } else {
-      console.log('Sign up initiated - verification email should be sent to:', email);
+      console.log('Sign up completed successfully for:', email);
     }
     
     return { error };
@@ -140,44 +138,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
-  const resendVerification = async (email: string) => {
-    console.log('Resending verification email to:', email);
-    
-    try {
-      // First try using our custom email service
-      const response = await supabase.functions.invoke('send-verification-email', {
-        body: { 
-          email: email,
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-      
-      if (response.error) {
-        console.error('Custom email service error:', response.error);
-        
-        // Fallback to Supabase's built-in resend
-        const { error: supabaseError } = await supabase.auth.resend({
-          type: 'signup',
-          email: email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`
-          }
-        });
-        
-        if (supabaseError) {
-          console.error('Supabase resend error:', supabaseError);
-          return { error: supabaseError };
-        }
-      }
-      
-      console.log('Verification email resent successfully');
-      return { error: null };
-    } catch (error) {
-      console.error('Resend verification error:', error);
-      return { error };
-    }
-  };
-
   const signOut = async () => {
     try {
       // Clean up auth state first
@@ -205,8 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signUp,
     signIn,
-    signOut,
-    resendVerification
+    signOut
   };
 
   return (
