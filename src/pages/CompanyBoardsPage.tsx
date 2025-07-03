@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
 import CompanyInviteForm from '@/components/CompanyInviteForm';
 import PendingInvitations from '@/components/PendingInvitations';
-import { Resend } from 'resend';
 
 interface Board {
   id: string;
@@ -48,8 +47,6 @@ const CompanyBoardsPage = () => {
     
     fetchCompanyAndBoards();
   }, [user, companyId, navigate]);
-
-const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
   
   const fetchCompanyAndBoards = async () => {
     if (!companyId) return;
@@ -247,26 +244,7 @@ const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
           <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
             <CompanyInviteForm 
               companyId={companyId} 
-              onInvitationSent={async () => {
-
-                
-
-            const retorno = await resend.emails.send({
-              from: 'lucas.lfs2004@gmail.com
-              to: ['lucas.lfs2004@gmail.com'],
-              subject: 'hello world',
-              html: '<p>it works!</p>',
-            });
-
-                {/* const response = await fetch('/api/emails/send', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs`,
-  },
-  body: JSON.stringify("<p>it works</p>"),
-}); */}
-            console.log("Retorno do envio de email: ", retorno)
+              onInvitationSent={() => {
                 // Refresh invitations list
                 console.log('Invitation sent, refreshing...');
               }}

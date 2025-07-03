@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -31,9 +32,3 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
-// vite.config.ts or vite.config.js
-export default defineConfig({
-  plugins: [react()],
-  // Other configurations...
-});
-
