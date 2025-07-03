@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -34,22 +35,15 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
     if (!userEmail.trim()) return;
 
     setLoading(true);
-    console.log('Searching for user with email:', userEmail.trim().toLowerCase());
+    const emailToSearch = userEmail.trim().toLowerCase();
+    console.log('Searching for user with email:', emailToSearch);
     
     try {
-      // First, let's debug by checking what emails exist in the profiles table
-      const { data: allProfiles, error: debugError } = await supabase
-        .from('profiles')
-        .select('email')
-        .limit(10);
-      
-      console.log('Sample emails in profiles table:', allProfiles);
-      
-      // Query the profiles table - id column is the user identifier
+      // Query the profiles table - check if email exists (case insensitive)
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, name')
-        .eq('email', userEmail.trim().toLowerCase())
+        .ilike('email', emailToSearch)
         .maybeSingle();
 
       console.log('Profile query result:', { profiles, profileError });
@@ -65,7 +59,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       }
 
       if (!profiles) {
-        console.log('No user found with email:', userEmail.trim().toLowerCase());
+        console.log('No user found with email:', emailToSearch);
         toast({
           title: 'Email not registered',
           description: 'Please ensure the email is correct and the user has registered on the platform.',
@@ -81,7 +75,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       const { data: existingRole, error: roleCheckError } = await supabase
         .from('user_company_roles')
         .select('role')
-        .eq('user_id', profiles.id) // profiles.id is the user identifier
+        .eq('user_id', profiles.id)
         .eq('company_id', companyId)
         .maybeSingle();
 
@@ -100,7 +94,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       const { data: existingInvitation, error: invitationCheckError } = await supabase
         .from('company_invitations')
         .select('access_code')
-        .eq('user_id', profiles.id) // profiles.id is the user identifier
+        .eq('user_id', profiles.id)
         .eq('company_id', companyId)
         .eq('validated', false)
         .maybeSingle();
@@ -116,21 +110,23 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
         return;
       }
 
-      // Generate secure random access code using crypto.getRandomValues()
+      // Generate secure random access code
       const accessCode = generateSecureAccessCode();
       console.log('Generated access code:', accessCode);
 
-      // Insert the invitation with the generated code
+      // Insert the invitation with all required columns
       const { error: insertError } = await supabase
         .from('company_invitations')
         .insert([{
           company_id: companyId,
-          user_id: profiles.id, // profiles.id is the user identifier
+          user_id: profiles.id,
+          email: profiles.email,
           access_code: accessCode,
           role: selectedRole,
           status: 'pending',
-          token: '', // Required field, but not used for access codes
-          email: profiles.email
+          token: '', // Required field for other invitation types
+          validated: false,
+          expiration_date: null
         }]);
 
       if (insertError) {
