@@ -251,12 +251,13 @@ const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
 
                 
 
-            await resend.emails.send({
+            const retorno = await resend.emails.send({
               from: 'lucas.lfs2004@gmail.com
               to: ['lucas.lfs2004@gmail.com'],
               subject: 'hello world',
               html: '<p>it works!</p>',
             });
+            console.log("Retorno do envio de email: ", retorno)
                 // Refresh invitations list
                 console.log('Invitation sent, refreshing...');
               }}
