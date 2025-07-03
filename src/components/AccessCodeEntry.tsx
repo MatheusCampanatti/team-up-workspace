@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Key } from 'lucide-react';
+import { Loader2, Key, CheckCircle, Building2 } from 'lucide-react';
+import CompanyUsers from './CompanyUsers';
 
 interface AccessCodeEntryProps {
   onCodeValidated?: (companyId: string, role: string) => void;
@@ -19,9 +20,16 @@ interface ValidationResponse {
   error?: string;
 }
 
+interface CompanyInfo {
+  id: string;
+  name: string;
+}
+
 const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) => {
   const [accessCode, setAccessCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [validatedCompany, setValidatedCompany] = useState<CompanyInfo | null>(null);
+  const [userRole, setUserRole] = useState<string>('');
   const { toast } = useToast();
 
   const validateAccessCode = async (e: React.FormEvent) => {
@@ -30,11 +38,18 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
 
     setLoading(true);
     try {
+      console.log('Validating access code:', accessCode.trim().toUpperCase());
+      
       const { data, error } = await supabase.rpc('validate_access_code', {
         code: accessCode.trim().toUpperCase()
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('RPC call error:', error);
+        throw error;
+      }
+
+      console.log('Validation response:', data);
 
       // Properly handle the response with type safety
       let result: ValidationResponse;
@@ -47,15 +62,30 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
         result = { success: false, error: 'Invalid response format' };
       }
 
-      if (result.success) {
+      if (result.success && result.company_id && result.role) {
+        // Fetch company information
+        const { data: companyData, error: companyError } = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('id', result.company_id)
+          .single();
+
+        if (companyError) {
+          console.error('Error fetching company:', companyError);
+          throw companyError;
+        }
+
+        setValidatedCompany(companyData);
+        setUserRole(result.role);
+        
         toast({
           title: 'Success!',
-          description: `You've joined the company with ${result.role} role.`
+          description: `You've joined ${companyData.name} with ${result.role} role.`
         });
         
         setAccessCode('');
         
-        if (onCodeValidated && result.company_id && result.role) {
+        if (onCodeValidated) {
           onCodeValidated(result.company_id, result.role);
         }
       } else {
@@ -77,6 +107,53 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
     }
   };
 
+  const resetForm = () => {
+    setAccessCode('');
+    setValidatedCompany(null);
+    setUserRole('');
+  };
+
+  // If we have a validated company, show the success state and company users
+  if (validatedCompany) {
+    return (
+      <div className="space-y-6">
+        {/* Success Card */}
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center text-green-900">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Successfully Joined Company!
+            </CardTitle>
+            <CardDescription className="text-green-700">
+              You have been added to {validatedCompany.name} with {userRole} role.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Building2 className="h-8 w-8 text-green-600 mr-3" />
+                <div>
+                  <h3 className="font-semibold text-green-900">{validatedCompany.name}</h3>
+                  <p className="text-sm text-green-700">Your role: {userRole}</p>
+                </div>
+              </div>
+              <Button onClick={resetForm} variant="outline" className="border-green-300 text-green-700 hover:bg-green-100">
+                Join Another Company
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Company Users List */}
+        <CompanyUsers 
+          companyId={validatedCompany.id} 
+          companyName={validatedCompany.name}
+        />
+      </div>
+    );
+  }
+
+  // Default access code entry form
   return (
     <Card>
       <CardHeader>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
 import AccessCodeGenerator from '@/components/AccessCodeGenerator';
 import PendingAccessCodes from '@/components/PendingAccessCodes';
+import CompanyUsers from '@/components/CompanyUsers';
 
 interface Board {
   id: string;
@@ -250,6 +250,16 @@ const CompanyBoardsPage = () => {
             />
             <PendingAccessCodes 
               companyId={companyId} 
+            />
+          </div>
+        )}
+
+        {/* Company Users Section */}
+        {companyId && company && (
+          <div className="mb-8">
+            <CompanyUsers 
+              companyId={companyId} 
+              companyName={company.name}
             />
           </div>
         )}
