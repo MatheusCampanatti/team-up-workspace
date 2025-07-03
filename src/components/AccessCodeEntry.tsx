@@ -32,13 +32,13 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
         .from('company_invitations')
         .select('*')
         .eq('access_code', accessCode.trim().toUpperCase())
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error checking access code:', error);
         toast({
-          title: 'Invalid Code',
-          description: 'Access code not found',
+          title: 'Error',
+          description: 'Failed to validate access code',
           variant: 'destructive'
         });
         return;
@@ -49,6 +49,12 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
         toast({
           title: 'Success!',
           description: 'Code found'
+        });
+      } else {
+        toast({
+          title: 'Invalid Code',
+          description: 'Access code not found',
+          variant: 'destructive'
         });
       }
     } catch (error: any) {
