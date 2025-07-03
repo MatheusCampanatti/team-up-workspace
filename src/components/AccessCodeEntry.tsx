@@ -12,6 +12,13 @@ interface AccessCodeEntryProps {
   onCodeValidated?: (companyId: string, role: string) => void;
 }
 
+interface ValidationResponse {
+  success: boolean;
+  company_id?: string;
+  role?: string;
+  error?: string;
+}
+
 const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) => {
   const [accessCode, setAccessCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,21 +36,23 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
 
       if (error) throw error;
 
-      if (data.success) {
+      const result = data as ValidationResponse;
+
+      if (result.success) {
         toast({
           title: 'Success!',
-          description: `You've joined the company with ${data.role} role.`
+          description: `You've joined the company with ${result.role} role.`
         });
         
         setAccessCode('');
         
-        if (onCodeValidated) {
-          onCodeValidated(data.company_id, data.role);
+        if (onCodeValidated && result.company_id && result.role) {
+          onCodeValidated(result.company_id, result.role);
         }
       } else {
         toast({
           title: 'Invalid Code',
-          description: data.error || 'Invalid or already used code',
+          description: result.error || 'Invalid or already used code',
           variant: 'destructive'
         });
       }
