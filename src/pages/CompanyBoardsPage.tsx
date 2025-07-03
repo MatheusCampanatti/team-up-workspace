@@ -251,12 +251,21 @@ const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
 
                 
 
-            const retorno = await resend.emails.send({
-              from: 'lucas.lfs2004@gmail.com
-              to: ['lucas.lfs2004@gmail.com'],
-              subject: 'hello world',
-              html: '<p>it works!</p>',
-            });
+            // const retorno = await resend.emails.send({
+            //   from: 'lucas.lfs2004@gmail.com
+            //   to: ['lucas.lfs2004@gmail.com'],
+            //   subject: 'hello world',
+            //   html: '<p>it works!</p>',
+            // });
+
+                const response = await fetch('/api/emails/send', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs`,
+  },
+  body: JSON.stringify("<p>it works</p>"),
+});
             console.log("Retorno do envio de email: ", retorno)
                 // Refresh invitations list
                 console.log('Invitation sent, refreshing...');
