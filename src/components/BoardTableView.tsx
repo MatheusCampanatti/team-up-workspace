@@ -60,7 +60,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
   const fetchBoardData = async () => {
     setLoading(true);
-    console.log('Fetching project data for boardId:', boardId);
+    console.log('Fetching board data for boardId:', boardId);
 
     try {
       // Fetch columns from board_columns table
@@ -75,7 +75,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         return;
       }
 
-      // Fetch tasks from board_items table
+      // Fetch items from board_items table
       const { data: itemsData, error: itemsError } = await supabase
         .from('board_items')
         .select('*')
@@ -83,17 +83,17 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         .order('order', { ascending: true, nullsFirst: false });
 
       if (itemsError) {
-        console.error('Error fetching tasks:', itemsError);
+        console.error('Error fetching items:', itemsError);
         return;
       }
 
-      // Fetch task values
+      // Fetch item values
       const { data: valuesData, error: valuesError } = await supabase
         .from('item_values')
         .select('*');
 
       if (valuesError) {
-        console.error('Error fetching task values:', valuesError);
+        console.error('Error fetching item values:', valuesError);
         return;
       }
 
@@ -102,7 +102,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       setItems(itemsData || []);
       setItemValues(valuesData || []);
     } catch (error) {
-      console.error('Unexpected error fetching project data:', error);
+      console.error('Unexpected error fetching board data:', error);
     } finally {
       setLoading(false);
     }
@@ -112,33 +112,33 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   const handleRealtimeChange = useCallback((payload: any) => {
     const { eventType, new: newRecord, old: oldRecord } = payload;
     
-    // Filter out changes that don't belong to our project
+    // Filter out changes that don't belong to our board
     const itemValue = newRecord || oldRecord;
     if (!itemValue) return;
     
-    // Check if this task value belongs to our project's tasks
+    // Check if this item value belongs to our board's items
     const belongsToBoard = items.some(item => item.id === itemValue.item_id);
     if (!belongsToBoard) return;
 
-    console.log('Processing realtime change for our project:', { eventType, itemValue });
+    console.log('Processing realtime change for our board:', { eventType, itemValue });
 
     setItemValues(prevValues => {
       switch (eventType) {
         case 'INSERT':
-          // Add new task value if it doesn't exist
+          // Add new item value if it doesn't exist
           if (!prevValues.find(v => v.id === newRecord.id)) {
             return [...prevValues, newRecord];
           }
           return prevValues;
 
         case 'UPDATE':
-          // Update existing task value
+          // Update existing item value
           return prevValues.map(value =>
             value.id === newRecord.id ? { ...value, ...newRecord } : value
           );
 
         case 'DELETE':
-          // Remove deleted task value
+          // Remove deleted item value
           return prevValues.filter(value => value.id !== oldRecord.id);
 
         default:
@@ -161,7 +161,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   };
 
   const updateItemValue = async (itemId: string, columnId: string, value: string) => {
-    console.log('Updating task value:', { itemId, columnId, value });
+    console.log('Updating item value:', { itemId, columnId, value });
 
     // Optimistic update - update local state immediately
     setItemValues(prev => {
@@ -198,7 +198,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           .eq('id', existingValue.id);
 
         if (error) {
-          console.error('Error updating task value:', error);
+          console.error('Error updating item value:', error);
           // Revert optimistic update on error
           setItemValues(prev => 
             prev.map(val =>
@@ -216,7 +216,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
           .select();
 
         if (error) {
-          console.error('Error creating task value:', error);
+          console.error('Error creating item value:', error);
           // Remove temporary entry on error
           setItemValues(prev => 
             prev.filter(val => !(val.item_id === itemId && val.column_id === columnId && val.id.startsWith('temp-')))
@@ -236,7 +236,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         }
       }
     } catch (error) {
-      console.error('Unexpected error updating task value:', error);
+      console.error('Unexpected error updating item value:', error);
     }
   };
 
@@ -266,7 +266,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   };
 
   const createDefaultCellsForItem = async (itemId: string) => {
-    console.log('Creating default cells for task:', itemId);
+    console.log('Creating default cells for item:', itemId);
     
     try {
       // Create default values for all columns
@@ -300,7 +300,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
   const addNewItem = async () => {
     if (!newItemName.trim()) return;
 
-    console.log('Adding new task:', newItemName);
+    console.log('Adding new item:', newItemName);
 
     try {
       const nextOrder = items.length > 0 ? Math.max(...items.map(item => item.order || 0)) + 1 : 1;
@@ -315,7 +315,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         .select();
 
       if (error) {
-        console.error('Error adding task:', error);
+        console.error('Error adding item:', error);
         return;
       }
 
@@ -324,11 +324,11 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
         setItems(prev => [...prev, newItem]);
         setNewItemName('');
         
-        // Create default cells for the new task
+        // Create default cells for the new item
         await createDefaultCellsForItem(newItem.id);
       }
     } catch (error) {
-      console.error('Unexpected error adding task:', error);
+      console.error('Unexpected error adding item:', error);
     }
   };
 
@@ -531,7 +531,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Project Table
+            Board Table
             <div className="flex gap-2">
               <div className="flex items-center gap-2">
                 <Input
@@ -566,7 +566,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-semibold">Task Name</TableHead>
+                  <TableHead className="font-semibold">Item Name</TableHead>
                   {columns.map((column) => (
                     <TableHead key={column.id} className="font-semibold min-w-[150px]">
                       {column.name}
@@ -590,7 +590,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                   <TableCell colSpan={columns.length + 1}>
                     <div className="flex items-center gap-2">
                       <Input
-                        placeholder="New task name"
+                        placeholder="New item name"
                         value={newItemName}
                         onChange={(e) => setNewItemName(e.target.value)}
                         onKeyDown={(e) => {
@@ -603,7 +603,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
                       />
                       <Button onClick={addNewItem} size="sm">
                         <Plus className="w-4 h-4 mr-1" />
-                        Add Task
+                        Add Item
                       </Button>
                     </div>
                   </TableCell>
@@ -614,7 +614,7 @@ const BoardTableView: React.FC<BoardTableViewProps> = ({ boardId }) => {
 
           {items.length === 0 && columns.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              <p>No columns or tasks yet. Add a column to get started!</p>
+              <p>No columns or items yet. Add a column to get started!</p>
             </div>
           )}
         </CardContent>

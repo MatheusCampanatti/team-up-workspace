@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
 import CompanyInviteForm from '@/components/CompanyInviteForm';
 import PendingInvitations from '@/components/PendingInvitations';
+import { Resend } from 'resend';
 
 interface Board {
   id: string;
@@ -47,12 +48,14 @@ const CompanyBoardsPage = () => {
     
     fetchCompanyAndBoards();
   }, [user, companyId, navigate]);
+
+const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
   
   const fetchCompanyAndBoards = async () => {
     if (!companyId) return;
     
     setLoading(true);
-    console.log('Fetching company and projects for company:', companyId);
+    console.log('Fetching company and boards for company:', companyId);
     
     try {
       // Fetch company details
@@ -74,7 +77,7 @@ const CompanyBoardsPage = () => {
       
       setCompany(companyData);
       
-      // Fetch projects for this company
+      // Fetch boards for this company
       const { data: boardsData, error: boardsError } = await supabase
         .from('boards')
         .select('id, name, created_at, company_id, created_by')
@@ -82,14 +85,14 @@ const CompanyBoardsPage = () => {
         .order('created_at', { ascending: false });
       
       if (boardsError) {
-        console.error('Error fetching projects:', boardsError);
+        console.error('Error fetching boards:', boardsError);
         toast({
-          title: 'Error loading projects',
+          title: 'Error loading boards',
           description: boardsError.message,
           variant: 'destructive'
         });
       } else {
-        console.log('Projects data:', boardsData);
+        console.log('Boards data:', boardsData);
         setBoards(boardsData || []);
       }
     } catch (error) {
@@ -109,7 +112,7 @@ const CompanyBoardsPage = () => {
     if (!user || !companyId || !newBoardName.trim()) return;
 
     setCreatingBoard(true);
-    console.log('Creating project:', newBoardName, 'for company:', companyId);
+    console.log('Creating board:', newBoardName, 'for company:', companyId);
 
     try {
       const { data: boardData, error: boardError } = await supabase
@@ -123,14 +126,14 @@ const CompanyBoardsPage = () => {
         .single();
 
       if (boardError) {
-        console.error('Error creating project:', boardError);
+        console.error('Error creating board:', boardError);
         throw boardError;
       }
 
-      console.log('Project created successfully:', boardData);
+      console.log('Board created successfully:', boardData);
       
       toast({
-        title: 'Project created!',
+        title: 'Board created!',
         description: `${newBoardName} has been created successfully.`
       });
 
@@ -140,7 +143,7 @@ const CompanyBoardsPage = () => {
     } catch (error: any) {
       console.error('Error in createBoard:', error);
       toast({
-        title: 'Error creating project',
+        title: 'Error creating board',
         description: error.message,
         variant: 'destructive'
       });
@@ -181,7 +184,7 @@ const CompanyBoardsPage = () => {
                 <h1 className="text-xl font-semibold text-gray-900">
                   {company?.name || 'Loading...'}
                 </h1>
-                <p className="text-sm text-gray-600">Projects</p>
+                <p className="text-sm text-gray-600">Boards</p>
               </div>
             </div>
           </div>
@@ -192,30 +195,30 @@ const CompanyBoardsPage = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
-            <p className="text-gray-600 mt-1">Manage your projects</p>
+            <h2 className="text-2xl font-bold text-gray-900">Boards</h2>
+            <p className="text-gray-600 mt-1">Manage your project boards</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Project
+                Create Board
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Project</DialogTitle>
+                <DialogTitle>Create New Board</DialogTitle>
                 <DialogDescription>
-                  Enter a name for your new project in {company?.name}.
+                  Enter a name for your new board in {company?.name}.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={createBoard} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="board-name">Project Name</Label>
+                  <Label htmlFor="board-name">Board Name</Label>
                   <Input
                     id="board-name"
-                    placeholder="Enter project name"
+                    placeholder="Enter board name"
                     value={newBoardName}
                     onChange={(e) => setNewBoardName(e.target.value)}
                     required
@@ -231,7 +234,7 @@ const CompanyBoardsPage = () => {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={creatingBoard}>
-                    {creatingBoard ? 'Creating...' : 'Create Project'}
+                    {creatingBoard ? 'Creating...' : 'Create Board'}
                   </Button>
                 </div>
               </form>
@@ -244,7 +247,26 @@ const CompanyBoardsPage = () => {
           <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
             <CompanyInviteForm 
               companyId={companyId} 
-              onInvitationSent={() => {
+              onInvitationSent={async () => {
+
+                
+
+            const retorno = await resend.emails.send({
+              from: 'lucas.lfs2004@gmail.com
+              to: ['lucas.lfs2004@gmail.com'],
+              subject: 'hello world',
+              html: '<p>it works!</p>',
+            });
+
+                {/* const response = await fetch('/api/emails/send', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs`,
+  },
+  body: JSON.stringify("<p>it works</p>"),
+}); */}
+            console.log("Retorno do envio de email: ", retorno)
                 // Refresh invitations list
                 console.log('Invitation sent, refreshing...');
               }}
@@ -255,37 +277,37 @@ const CompanyBoardsPage = () => {
           </div>
         )}
 
-        {/* Projects Grid */}
+        {/* Boards Grid */}
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-2">Loading projects...</p>
+            <p className="text-gray-600 mt-2">Loading boards...</p>
           </div>
         ) : boards.length === 0 ? (
           <div className="text-center py-12">
             <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
-            <p className="text-gray-600 mb-4">Create your first project to get started</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No boards yet</h3>
+            <p className="text-gray-600 mb-4">Create your first board to get started</p>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Project
+                  Create Your First Board
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create New Project</DialogTitle>
+                  <DialogTitle>Create New Board</DialogTitle>
                   <DialogDescription>
-                    Enter a name for your new project in {company?.name}.
+                    Enter a name for your new board in {company?.name}.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={createBoard} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="board-name">Project Name</Label>
+                    <Label htmlFor="board-name">Board Name</Label>
                     <Input
                       id="board-name"
-                      placeholder="Enter project name"
+                      placeholder="Enter board name"
                       value={newBoardName}
                       onChange={(e) => setNewBoardName(e.target.value)}
                       required
@@ -301,7 +323,7 @@ const CompanyBoardsPage = () => {
                       Cancel
                     </Button>
                     <Button type="submit" disabled={creatingBoard}>
-                      {creatingBoard ? 'Creating...' : 'Create Project'}
+                      {creatingBoard ? 'Creating...' : 'Create Board'}
                     </Button>
                   </div>
                 </form>
@@ -327,7 +349,7 @@ const CompanyBoardsPage = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-gray-600">
-                    Click to manage this project's tasks and columns.
+                    Click to manage this board's items and columns.
                   </p>
                 </CardContent>
               </Card>
