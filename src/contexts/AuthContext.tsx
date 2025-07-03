@@ -50,11 +50,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // If user just signed up, ensure profile exists
+        if (event === 'SIGNED_UP' && session?.user) {
+          console.log('User signed up, checking profile creation');
+          setTimeout(async () => {
+            try {
+              // Check if profile exists
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+              if (error && error.code === 'PGRST116') {
+                // Profile doesn't exist, create it
+                console.log('Profile not found, creating one');
+                const { error: insertError } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: session.user.id,
+                    email: session.user.email || '',
+                    name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || ''
+                  });
+
+                if (insertError) {
+                  console.error('Error creating profile:', insertError);
+                } else {
+                  console.log('Profile created successfully');
+                }
+              } else if (profile) {
+                console.log('Profile already exists:', profile);
+              }
+            } catch (err) {
+              console.error('Error checking/creating profile:', err);
+            }
+          }, 1000);
+        }
       }
     );
 
@@ -78,16 +115,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Continue even if this fails
     }
 
+    console.log('Signing up user with name:', name);
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          name: name
+          name: name,
+          full_name: name
         },
         emailRedirectTo: `${window.location.origin}/`
       }
     });
+    
+    if (error) {
+      console.error('Sign up error:', error);
+    } else {
+      console.log('Sign up successful');
+    }
+    
     return { error };
   };
 
