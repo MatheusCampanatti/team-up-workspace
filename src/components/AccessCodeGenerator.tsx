@@ -38,17 +38,35 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
     console.log('Searching for user with email:', userEmail.trim().toLowerCase());
     
     try {
+      // First, let's debug by checking what emails exist in the profiles table
+      const { data: allProfiles, error: debugError } = await supabase
+        .from('profiles')
+        .select('email')
+        .limit(10);
+      
+      console.log('Sample emails in profiles table:', allProfiles);
+      
       // Query the profiles table with case-insensitive email matching
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, name')
-        .ilike('email', userEmail.trim()) // Using ilike for case-insensitive matching
-        .single();
+        .eq('email', userEmail.trim().toLowerCase())
+        .maybeSingle(); // Use maybeSingle instead of single to avoid error when no rows found
 
       console.log('Profile query result:', { profiles, profileError });
 
-      if (profileError || !profiles) {
-        console.error('User not found:', profileError);
+      if (profileError) {
+        console.error('Database error:', profileError);
+        toast({
+          title: 'Database error',
+          description: 'There was an error checking the user email. Please try again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (!profiles) {
+        console.log('No user found with email:', userEmail.trim().toLowerCase());
         toast({
           title: 'Email not registered',
           description: 'Please ensure the email is correct and the user has registered on the platform.',
