@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Building2, Plus, LogOut, User } from 'lucide-react';
+import { Building2, Plus, LogOut, User, Users, Calendar, TrendingUp } from 'lucide-react';
 
 interface Company {
   id: string;
@@ -66,7 +67,6 @@ const DashboardPage = () => {
     setLoading(true);
     console.log('Fetching companies for user:', user.id);
     
-    // First, let's get all companies the user has roles in
     const { data: roleData, error: roleError } = await supabase
       .from('user_company_roles')
       .select('company_id, role')
@@ -92,10 +92,8 @@ const DashboardPage = () => {
       return;
     }
 
-    // Extract company IDs
     const companyIds = roleData.map(role => role.company_id);
     
-    // Now fetch the company details
     const { data: companiesData, error: companiesError } = await supabase
       .from('companies')
       .select('id, name, created_at')
@@ -111,7 +109,6 @@ const DashboardPage = () => {
     } else {
       console.log('Companies data:', companiesData);
       
-      // Combine company data with role information
       const formattedCompanies = companiesData?.map(company => {
         const userRole = roleData.find(role => role.company_id === company.id);
         return {
@@ -135,7 +132,6 @@ const DashboardPage = () => {
     console.log('Creating company:', newCompanyName);
 
     try {
-      // Create the company
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .insert([{ name: newCompanyName.trim() }])
@@ -149,7 +145,6 @@ const DashboardPage = () => {
 
       console.log('Company created:', companyData);
 
-      // Add user as Admin to the company
       const { error: roleError } = await supabase
         .from('user_company_roles')
         .insert([{
@@ -172,7 +167,7 @@ const DashboardPage = () => {
 
       setNewCompanyName('');
       setIsDialogOpen(false);
-      fetchCompanies(); // Refresh the list
+      fetchCompanies();
     } catch (error: any) {
       console.error('Error in createCompany:', error);
       toast({
@@ -199,19 +194,22 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600 mr-2" />
-              <h1 className="text-xl font-semibold text-gray-900">Company Manager</h1>
+              <Building2 className="h-8 w-8 text-blue-600 mr-3" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">WorkBoard</h1>
+                <p className="text-sm text-gray-500">Project Management Made Simple</p>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center text-sm text-gray-700">
-                <User className="h-4 w-4 mr-1" />
-                {profile?.name || user.email}
+              <div className="flex items-center text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">
+                <User className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="font-medium">{profile?.name || user.email}</span>
               </div>
-              <Button variant="outline" onClick={handleSignOut}>
+              <Button variant="outline" onClick={handleSignOut} className="text-gray-700 hover:text-red-600">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
@@ -222,24 +220,82 @@ const DashboardPage = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {profile?.name?.split(' ')[0] || 'there'}! 👋
+          </h2>
+          <p className="text-gray-600">
+            Manage your projects and collaborate with your team across all your companies.
+          </p>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-blue-100">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-blue-200 mr-4">
+                  <Building2 className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-900">{companies.length}</p>
+                  <p className="text-sm text-blue-700">Companies</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-green-50 to-green-100">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-green-200 mr-4">
+                  <Users className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-green-900">
+                    {companies.filter(c => c.role === 'Admin').length}
+                  </p>
+                  <p className="text-sm text-green-700">Admin Roles</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-0 shadow-sm bg-gradient-to-r from-purple-50 to-purple-100">
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-lg bg-purple-200 mr-4">
+                  <TrendingUp className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-purple-900">Active</p>
+                  <p className="text-sm text-purple-700">Status</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Companies Section */}
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Your Companies</h2>
-            <p className="text-gray-600 mt-1">Manage and create companies you belong to</p>
+            <h3 className="text-2xl font-bold text-gray-900">Your Companies</h3>
+            <p className="text-gray-600 mt-1">Access and manage all your company workspaces</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Company
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Company</DialogTitle>
                 <DialogDescription>
-                  Enter a name for your new company. You'll be added as an Admin.
+                  Enter a name for your new company workspace. You'll be added as an Admin automatically.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={createCompany} className="space-y-4">
@@ -257,7 +313,7 @@ const DashboardPage = () => {
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
                     Create Company
                   </Button>
                 </div>
@@ -273,22 +329,26 @@ const DashboardPage = () => {
             <p className="text-gray-600 mt-2">Loading companies...</p>
           </div>
         ) : companies.length === 0 ? (
-          <div className="text-center py-12">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <div className="text-center py-16">
+            <div className="bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+              <Building2 className="h-10 w-10 text-gray-400" />
+            </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No companies yet</h3>
-            <p className="text-gray-600 mb-4">Create your first company to get started</p>
+            <p className="text-gray-600 mb-6 max-w-sm mx-auto">
+              Create your first company workspace to start managing projects and collaborating with your team.
+            </p>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Your First Company
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Create New Company</DialogTitle>
                   <DialogDescription>
-                    Enter a name for your new company. You'll be added as an Admin.
+                    Enter a name for your new company workspace. You'll be added as an Admin automatically.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={createCompany} className="space-y-4">
@@ -306,7 +366,7 @@ const DashboardPage = () => {
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                       Cancel
                     </Button>
-                    <Button type="submit">
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
                       Create Company
                     </Button>
                   </div>
@@ -317,28 +377,32 @@ const DashboardPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {companies.map((company) => (
-              <Card key={company.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {company.name}
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+              <Card key={company.id} className="hover:shadow-lg transition-all duration-200 border-0 shadow-sm bg-white">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <span className="text-gray-900">{company.name}</span>
+                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                      company.role === 'Admin' 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
                       {company.role}
                     </span>
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="flex items-center text-sm text-gray-500">
+                    <Calendar className="h-4 w-4 mr-1" />
                     Created {new Date(company.created_at).toLocaleDateString()}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-sm text-gray-600">
-                    You are an {company.role} of this company.
+                <CardContent className="pt-0">
+                  <p className="text-sm text-gray-600 mb-4">
+                    You have {company.role.toLowerCase()} access to this company workspace.
                   </p>
                   <Button 
                     onClick={() => viewCompanyBoards(company.id)}
-                    className="w-full"
-                    variant="outline"
+                    className="w-full bg-gray-900 hover:bg-gray-800 text-white"
                   >
-                    View Boards
+                    Open Workspace
                   </Button>
                 </CardContent>
               </Card>
