@@ -252,7 +252,7 @@ const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
                 
 
             await resend.emails.send({
-              from: 'Acme <onboarding@resend.dev>',
+              from: 'lucas.lfs2004@gmail.com
               to: ['lucas.lfs2004@gmail.com'],
               subject: 'hello world',
               html: '<p>it works!</p>',
