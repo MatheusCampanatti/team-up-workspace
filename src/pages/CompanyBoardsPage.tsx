@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
 import CompanyInviteForm from '@/components/CompanyInviteForm';
 import PendingInvitations from '@/components/PendingInvitations';
+import { Resend } from 'resend';
 
 interface Board {
   id: string;
@@ -48,6 +49,8 @@ const CompanyBoardsPage = () => {
     fetchCompanyAndBoards();
   }, [user, companyId, navigate]);
 
+const resend = new Resend('re_4ALaVYXg_7A8MSCe8vbEwgG7772vkM5rs');
+  
   const fetchCompanyAndBoards = async () => {
     if (!companyId) return;
     
@@ -244,7 +247,16 @@ const CompanyBoardsPage = () => {
           <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
             <CompanyInviteForm 
               companyId={companyId} 
-              onInvitationSent={() => {
+              onInvitationSent={async () => {
+
+                
+
+            await resend.emails.send({
+              from: 'Acme <onboarding@resend.dev>',
+              to: ['lucas.lfs2004@gmail.com'],
+              subject: 'hello world',
+              html: '<p>it works!</p>',
+            });
                 // Refresh invitations list
                 console.log('Invitation sent, refreshing...');
               }}
