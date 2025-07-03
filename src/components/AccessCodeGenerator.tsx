@@ -19,8 +19,16 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
   const [selectedRole, setSelectedRole] = useState('Member');
   const [loading, setLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [foundUser, setFoundUser] = useState<{ id: string; email: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+
+  // Generate secure random 8-character hexadecimal access code
+  const generateSecureAccessCode = (): string => {
+    const array = new Uint8Array(4); // 4 bytes = 8 hex characters
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('');
+  };
 
   const generateAccessCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,14 +50,15 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       if (profileError || !profiles) {
         console.error('User not found:', profileError);
         toast({
-          title: 'User not found',
-          description: 'No user found with this email address. Please ensure the email is correct and the user has registered on the platform.',
+          title: 'Email not registered',
+          description: 'Please ensure the email is correct and the user has registered on the platform.',
           variant: 'destructive'
         });
         return;
       }
 
       console.log('Found user:', profiles);
+      setFoundUser(profiles);
 
       // Check if user already belongs to this company
       const { data: existingRole, error: roleCheckError } = await supabase
@@ -90,15 +99,8 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
         return;
       }
 
-      // Generate access code using the database function
-      const { data: codeData, error: codeError } = await supabase.rpc('generate_access_code');
-      
-      if (codeError) {
-        console.error('Error generating code:', codeError);
-        throw codeError;
-      }
-
-      const accessCode = codeData;
+      // Generate secure random access code using crypto.getRandomValues()
+      const accessCode = generateSecureAccessCode();
       console.log('Generated access code:', accessCode);
 
       // Insert the invitation with the generated code
@@ -156,6 +158,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
     setUserEmail('');
     setSelectedRole('Member');
     setGeneratedCode(null);
+    setFoundUser(null);
     setCopied(false);
   };
 
@@ -172,8 +175,15 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
           <div className="space-y-4">
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h3 className="font-medium text-green-900 mb-2">Access Code Generated!</h3>
+              {foundUser && (
+                <div className="mb-3 text-sm text-green-800">
+                  <p><strong>User:</strong> {foundUser.name || 'N/A'}</p>
+                  <p><strong>Email:</strong> {foundUser.email}</p>
+                  <p><strong>Role:</strong> {selectedRole}</p>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
-                <code className="bg-white px-3 py-2 rounded border font-mono text-lg">
+                <code className="bg-white px-3 py-2 rounded border font-mono text-lg tracking-wider">
                   {generatedCode}
                 </code>
                 <Button
