@@ -23,7 +23,7 @@ const BoardPage = () => {
 
   useEffect(() => {
     if (!boardId) {
-      setError('Board ID is required');
+      setError('Project ID is required');
       setLoading(false);
       return;
     }
@@ -36,7 +36,7 @@ const BoardPage = () => {
 
     setLoading(true);
     setError(null);
-    console.log('Fetching board with ID:', boardId);
+    console.log('Fetching project with ID:', boardId);
 
     try {
       const { data: boardData, error: boardError } = await supabase
@@ -46,21 +46,21 @@ const BoardPage = () => {
         .maybeSingle();
 
       if (boardError) {
-        console.error('Error fetching board:', boardError);
-        setError('Failed to load board');
+        console.error('Error fetching project:', boardError);
+        setError('Failed to load project');
         return;
       }
 
       if (!boardData) {
-        console.log('Board not found');
-        setError('Board not found');
+        console.log('Project not found');
+        setError('Project not found');
         return;
       }
 
-      console.log('Board data loaded:', boardData);
+      console.log('Project data loaded:', boardData);
       setBoard(boardData);
     } catch (error) {
-      console.error('Unexpected error fetching board:', error);
+      console.error('Unexpected error fetching project:', error);
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -97,12 +97,12 @@ const BoardPage = () => {
           <CardContent className="flex flex-col items-center justify-center py-8">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {error === 'Board not found' ? 'Board Not Found' : 'Error Loading Board'}
+              {error === 'Project not found' ? 'Project Not Found' : 'Error Loading Project'}
             </h2>
             <p className="text-gray-600 text-center">
-              {error === 'Board not found' 
-                ? 'The board you are looking for does not exist or has been removed.'
-                : 'There was an error loading the board. Please try again later.'
+              {error === 'Project not found' 
+                ? 'The project you are looking for does not exist or has been removed.'
+                : 'There was an error loading the project. Please try again later.'
               }
             </p>
           </CardContent>
@@ -126,19 +126,19 @@ const BoardPage = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle>Board Details</CardTitle>
+              <CardTitle>Project Details</CardTitle>
               <CardDescription>
-                Information about this board
+                Information about this project
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Board Name</label>
+                  <label className="text-sm font-medium text-gray-700">Project Name</label>
                   <p className="text-gray-900 mt-1">{board.name}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Board ID</label>
+                  <label className="text-sm font-medium text-gray-700">Project ID</label>
                   <p className="text-gray-500 text-sm mt-1 font-mono">{board.id}</p>
                 </div>
                 <div>
