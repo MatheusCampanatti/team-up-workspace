@@ -27,12 +27,10 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
     try {
       console.log('Checking access code:', accessCode.trim().toUpperCase());
       
-      // Check if the access code exists in the company_invitations table
-      const { data, error } = await supabase
-        .from('company_invitations')
-        .select('*')
-        .eq('access_code', accessCode.trim().toUpperCase())
-        .maybeSingle();
+      // Use the database function to validate the access code
+      const { data, error } = await supabase.rpc('validate_access_code', {
+        code: accessCode.trim().toUpperCase()
+      });
 
       if (error) {
         console.error('Error checking access code:', error);
@@ -44,16 +42,17 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
         return;
       }
 
-      if (data) {
-        console.log('Access code found:', data);
+      console.log('Validation result:', data);
+
+      if (data && data.success) {
         toast({
           title: 'Success!',
           description: 'Code found'
         });
       } else {
         toast({
-          title: 'Invalid Code',
-          description: 'Access code not found',
+          title: 'Invalid Code', 
+          description: data?.error || 'Access code not found',
           variant: 'destructive'
         });
       }
