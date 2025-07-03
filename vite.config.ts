@@ -31,4 +31,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
+// vite.config.ts or vite.config.js
+export default defineConfig({
+  plugins: [react()],
+  // Other configurations...
+});
 
