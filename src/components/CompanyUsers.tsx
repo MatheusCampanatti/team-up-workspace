@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,37 +32,50 @@ const CompanyUsers: React.FC<CompanyUsersProps> = ({ companyId, companyName }) =
     console.log('Fetching users for company:', companyId);
     
     try {
-      // Get all users in this company with their profiles
-      const { data: usersData, error } = await supabase
+      // First get all user roles for this company
+      const { data: rolesData, error: rolesError } = await supabase
         .from('user_company_roles')
-        .select(`
-          id,
-          role,
-          created_at,
-          profiles!inner (
-            id,
-            name,
-            email
-          )
-        `)
+        .select('user_id, role, created_at')
         .eq('company_id', companyId)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching company users:', error);
-        throw error;
+      if (rolesError) {
+        console.error('Error fetching company roles:', rolesError);
+        throw rolesError;
       }
 
-      console.log('Company users data:', usersData);
+      console.log('Company roles data:', rolesData);
 
-      // Transform the data to match our interface
-      const transformedUsers: CompanyUser[] = usersData?.map((item: any) => ({
-        id: item.profiles.id,
-        name: item.profiles.name,
-        email: item.profiles.email,
-        role: item.role,
-        created_at: item.created_at
-      })) || [];
+      if (!rolesData || rolesData.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Then get profiles for all these users
+      const userIds = rolesData.map(role => role.user_id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
+
+      console.log('Profiles data:', profilesData);
+
+      // Combine the data
+      const transformedUsers: CompanyUser[] = rolesData.map((roleItem: any) => {
+        const profile = profilesData?.find(p => p.id === roleItem.user_id);
+        return {
+          id: roleItem.user_id,
+          name: profile?.name || 'Unknown User',
+          email: profile?.email || 'No email',
+          role: roleItem.role,
+          created_at: roleItem.created_at
+        };
+      });
 
       setUsers(transformedUsers);
     } catch (error: any) {
