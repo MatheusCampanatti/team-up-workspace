@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
+import AccessCodeGenerator from '@/components/AccessCodeGenerator';
+import PendingAccessCodes from '@/components/PendingAccessCodes';
 
 interface Board {
   id: string;
@@ -236,6 +238,21 @@ const CompanyBoardsPage = () => {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Team Management Section - Access Code System */}
+        {companyId && company && (
+          <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AccessCodeGenerator 
+              companyId={companyId} 
+              onCodeGenerated={() => {
+                console.log('Access code generated, refreshing...');
+              }}
+            />
+            <PendingAccessCodes 
+              companyId={companyId} 
+            />
+          </div>
+        )}
 
         {/* Boards Grid */}
         {loading ? (

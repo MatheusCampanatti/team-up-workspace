@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, LogOut, User, Users, Calendar, TrendingUp } from 'lucide-react';
+import AccessCodeEntry from '@/components/AccessCodeEntry';
 
 interface Company {
   id: string;
@@ -187,6 +188,11 @@ const DashboardPage = () => {
     navigate(`/company/${companyId}/boards`);
   };
 
+  const handleCodeValidated = (companyId: string, role: string) => {
+    console.log('Code validated for company:', companyId, 'with role:', role);
+    fetchCompanies(); // Refresh the companies list
+  };
+
   if (!user) {
     return null;
   }
@@ -228,6 +234,11 @@ const DashboardPage = () => {
           <p className="text-gray-600">
             Manage your projects and collaborate with your team across all your companies.
           </p>
+        </div>
+
+        {/* Access Code Entry Section */}
+        <div className="mb-8">
+          <AccessCodeEntry onCodeValidated={handleCodeValidated} />
         </div>
 
         {/* Quick Stats */}
@@ -335,7 +346,7 @@ const DashboardPage = () => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No companies yet</h3>
             <p className="text-gray-600 mb-6 max-w-sm mx-auto">
-              Create your first company workspace to get started with project management.
+              Create your first company workspace or enter an access code to join an existing company.
             </p>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
