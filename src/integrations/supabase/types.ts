@@ -140,31 +140,43 @@ export type Database = {
       }
       company_invitations: {
         Row: {
+          access_code: string | null
           company_id: string
           created_at: string | null
           email: string
+          expiration_date: string | null
           id: string
           role: string
           status: string
           token: string
+          user_id: string | null
+          validated: boolean | null
         }
         Insert: {
+          access_code?: string | null
           company_id: string
           created_at?: string | null
           email: string
+          expiration_date?: string | null
           id?: string
           role?: string
           status?: string
           token: string
+          user_id?: string | null
+          validated?: boolean | null
         }
         Update: {
+          access_code?: string | null
           company_id?: string
           created_at?: string | null
           email?: string
+          expiration_date?: string | null
           id?: string
           role?: string
           status?: string
           token?: string
+          user_id?: string | null
+          validated?: boolean | null
         }
         Relationships: [
           {
@@ -297,6 +309,10 @@ export type Database = {
         Args: { board_id_param: string }
         Returns: undefined
       }
+      generate_access_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_user_role_in_company: {
         Args: { company_uuid: string }
         Returns: string
@@ -304,6 +320,10 @@ export type Database = {
       user_has_company_access: {
         Args: { company_uuid: string }
         Returns: boolean
+      }
+      validate_access_code: {
+        Args: { code: string }
+        Returns: Json
       }
     }
     Enums: {

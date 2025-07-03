@@ -10,8 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Building2, Plus, Calendar, ArrowLeft } from 'lucide-react';
-import CompanyInviteForm from '@/components/CompanyInviteForm';
-import PendingInvitations from '@/components/PendingInvitations';
+import AccessCodeGenerator from '@/components/AccessCodeGenerator';
+import PendingAccessCodes from '@/components/PendingAccessCodes';
 
 interface Board {
   id: string;
@@ -239,17 +239,16 @@ const CompanyBoardsPage = () => {
           </Dialog>
         </div>
 
-        {/* Team Management Section - Only show for Admins */}
+        {/* Team Management Section - Access Code System */}
         {companyId && company && (
           <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <CompanyInviteForm 
+            <AccessCodeGenerator 
               companyId={companyId} 
-              onInvitationSent={() => {
-                // Refresh invitations list
-                console.log('Invitation sent, refreshing...');
+              onCodeGenerated={() => {
+                console.log('Access code generated, refreshing...');
               }}
             />
-            <PendingInvitations 
+            <PendingAccessCodes 
               companyId={companyId} 
             />
           </div>
