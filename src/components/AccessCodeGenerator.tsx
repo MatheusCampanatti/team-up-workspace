@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,7 @@ interface AccessCodeGeneratorProps {
 
 const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, onCodeGenerated }) => {
   const [selectedRole, setSelectedRole] = useState('Member');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -28,44 +30,43 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
   };
 
   const generateAccessCode = async () => {
+    if (!email.trim()) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter an email address',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setLoading(true);
     console.log('Generating access code for company:', companyId);
     
     try {
+      // Get the current user (company creator)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       // Generate secure random access code
       const accessCode = generateSecureAccessCode();
       console.log('Generated access code:', accessCode);
 
-      // Check if this access code already exists (very unlikely but good to check)
-      const { data: existingCode, error: checkError } = await supabase
-        .from('company_invitations')
-        .select('access_code')
-        .eq('access_code', accessCode)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Error checking existing access code:', checkError);
-        throw checkError;
-      }
-
-      if (existingCode) {
-        // Extremely unlikely, but regenerate if code exists
-        console.log('Access code already exists, regenerating...');
-        generateAccessCode(); // Retry
-        return;
-      }
+      // Generate a unique token using crypto.randomUUID()
+      const uniqueToken = crypto.randomUUID();
 
       // Insert the invitation with all required columns
       const { error: insertError } = await supabase
         .from('company_invitations')
         .insert([{
           company_id: companyId,
-          user_id: null, // Not tied to a specific user
-          email: '', // Not tied to a specific email
+          user_id: user.id, // User who created the company
+          email: email.trim(),
           access_code: accessCode,
           role: selectedRole,
           status: 'pending',
-          token: '', // Required field for other invitation types
+          token: uniqueToken, // Use unique UUID token
           validated: false,
           expiration_date: null
         }]);
@@ -78,7 +79,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       setGeneratedCode(accessCode);
       toast({
         title: 'Access code generated!',
-        description: `Access code created for ${selectedRole} role.`
+        description: `Access code created for ${email} with ${selectedRole} role.`
       });
 
       if (onCodeGenerated) {
@@ -110,6 +111,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
 
   const resetForm = () => {
     setSelectedRole('Member');
+    setEmail('');
     setGeneratedCode(null);
     setCopied(false);
   };
@@ -119,7 +121,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       <CardHeader>
         <CardTitle>Generate Access Code</CardTitle>
         <CardDescription>
-          Create a unique access code that anyone can use to join your company
+          Create a unique access code for a specific user to join your company
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -128,8 +130,8 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h3 className="font-medium text-green-900 mb-2">Access Code Generated!</h3>
               <div className="mb-3 text-sm text-green-800">
+                <p><strong>Email:</strong> {email}</p>
                 <p><strong>Role:</strong> {selectedRole}</p>
-                <p><strong>Usage:</strong> Anyone can use this code to join the company</p>
               </div>
               <div className="flex items-center space-x-2">
                 <code className="bg-white px-3 py-2 rounded border font-mono text-lg tracking-wider">
@@ -145,7 +147,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
                 </Button>
               </div>
               <p className="text-sm text-green-700 mt-2">
-                Share this code with anyone you want to join your company with {selectedRole} role.
+                Share this code with {email} to join your company with {selectedRole} role.
               </p>
             </div>
             <Button onClick={resetForm} variant="outline" className="w-full">
@@ -155,7 +157,19 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
         ) : (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="role">Role for new members</Label>
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter user's email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="role">Role for new member</Label>
               <Select value={selectedRole} onValueChange={setSelectedRole}>
                 <SelectTrigger>
                   <SelectValue />
