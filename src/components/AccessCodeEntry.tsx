@@ -36,10 +36,16 @@ const AccessCodeEntry: React.FC<AccessCodeEntryProps> = ({ onCodeValidated }) =>
 
       if (error) throw error;
 
-      // Safe type conversion with proper validation
-      const result = (typeof data === 'object' && data !== null && !Array.isArray(data)) 
-        ? data as ValidationResponse 
-        : { success: false, error: 'Invalid response format' };
+      // Properly handle the response with type safety
+      let result: ValidationResponse;
+      
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // Cast to unknown first, then to ValidationResponse for proper type conversion
+        const unknownData = data as unknown;
+        result = unknownData as ValidationResponse;
+      } else {
+        result = { success: false, error: 'Invalid response format' };
+      }
 
       if (result.success) {
         toast({

@@ -27,30 +27,39 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
     if (!userEmail.trim()) return;
 
     setLoading(true);
+    console.log('Searching for user with email:', userEmail.trim().toLowerCase());
+    
     try {
-      // First, check if the user exists by email
+      // Query the profiles table with case-insensitive email matching
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, name')
-        .eq('email', userEmail.trim().toLowerCase())
+        .ilike('email', userEmail.trim()) // Using ilike for case-insensitive matching
         .single();
 
+      console.log('Profile query result:', { profiles, profileError });
+
       if (profileError || !profiles) {
+        console.error('User not found:', profileError);
         toast({
           title: 'User not found',
-          description: 'No user found with this email address.',
+          description: 'No user found with this email address. Please ensure the email is correct and the user has registered on the platform.',
           variant: 'destructive'
         });
         return;
       }
 
+      console.log('Found user:', profiles);
+
       // Check if user already belongs to this company
-      const { data: existingRole } = await supabase
+      const { data: existingRole, error: roleCheckError } = await supabase
         .from('user_company_roles')
         .select('role')
         .eq('user_id', profiles.id)
         .eq('company_id', companyId)
-        .single();
+        .maybeSingle();
+
+      console.log('Existing role check:', { existingRole, roleCheckError });
 
       if (existingRole) {
         toast({
@@ -62,13 +71,15 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       }
 
       // Check if there's already a pending access code for this user
-      const { data: existingInvitation } = await supabase
+      const { data: existingInvitation, error: invitationCheckError } = await supabase
         .from('company_invitations')
         .select('access_code')
         .eq('user_id', profiles.id)
         .eq('company_id', companyId)
         .eq('validated', false)
-        .single();
+        .maybeSingle();
+
+      console.log('Existing invitation check:', { existingInvitation, invitationCheckError });
 
       if (existingInvitation) {
         toast({
@@ -82,9 +93,13 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       // Generate access code using the database function
       const { data: codeData, error: codeError } = await supabase.rpc('generate_access_code');
       
-      if (codeError) throw codeError;
+      if (codeError) {
+        console.error('Error generating code:', codeError);
+        throw codeError;
+      }
 
       const accessCode = codeData;
+      console.log('Generated access code:', accessCode);
 
       // Insert the invitation with the generated code
       const { error: insertError } = await supabase
@@ -99,7 +114,10 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
           email: profiles.email
         }]);
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting invitation:', insertError);
+        throw insertError;
+      }
 
       setGeneratedCode(accessCode);
       toast({
@@ -114,7 +132,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       console.error('Error generating access code:', error);
       toast({
         title: 'Error generating code',
-        description: error.message,
+        description: error.message || 'An unexpected error occurred',
         variant: 'destructive'
       });
     } finally {
