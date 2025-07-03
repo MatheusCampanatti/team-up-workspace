@@ -55,6 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Log different auth events for debugging
+        if (event === 'SIGNED_UP') {
+          console.log('User signed up successfully. Profile will be created by database trigger.');
+        }
+        if (event === 'SIGNED_IN') {
+          console.log('User signed in successfully');
+        }
       }
     );
 
@@ -87,14 +95,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: name,
           full_name: name
         },
-        emailRedirectTo: `${window.location.origin}/`
+        emailRedirectTo: `${window.location.origin}/dashboard`
       }
     });
     
     if (error) {
       console.error('Sign up error:', error);
     } else {
-      console.log('Sign up successful');
+      console.log('Sign up successful - check email for verification');
     }
     
     return { error };
