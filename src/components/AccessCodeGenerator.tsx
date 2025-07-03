@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,54 +14,71 @@ interface AccessCodeGeneratorProps {
   onCodeGenerated?: () => void;
 }
 
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-}
-
 const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, onCodeGenerated }) => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState('Member');
   const [loading, setLoading] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(true);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, email, name');
-
-      if (error) throw error;
-
-      setUsers(profiles || []);
-    } catch (error: any) {
-      console.error('Error fetching users:', error);
-      toast({
-        title: 'Error loading users',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
   const generateAccessCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUserId) return;
+    if (!userEmail.trim()) return;
 
     setLoading(true);
     try {
+      // First, check if the user exists by email
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email, name')
+        .eq('email', userEmail.trim().toLowerCase())
+        .single();
+
+      if (profileError || !profiles) {
+        toast({
+          title: 'User not found',
+          description: 'No user found with this email address.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Check if user already belongs to this company
+      const { data: existingRole } = await supabase
+        .from('user_company_roles')
+        .select('role')
+        .eq('user_id', profiles.id)
+        .eq('company_id', companyId)
+        .single();
+
+      if (existingRole) {
+        toast({
+          title: 'User already in company',
+          description: `This user is already a ${existingRole.role} in your company.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Check if there's already a pending access code for this user
+      const { data: existingInvitation } = await supabase
+        .from('company_invitations')
+        .select('access_code')
+        .eq('user_id', profiles.id)
+        .eq('company_id', companyId)
+        .eq('validated', false)
+        .single();
+
+      if (existingInvitation) {
+        toast({
+          title: 'Code already exists',
+          description: `There's already a pending access code for this user: ${existingInvitation.access_code}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
       // Generate access code using the database function
       const { data: codeData, error: codeError } = await supabase.rpc('generate_access_code');
       
@@ -74,12 +91,12 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
         .from('company_invitations')
         .insert([{
           company_id: companyId,
-          user_id: selectedUserId,
+          user_id: profiles.id,
           access_code: accessCode,
           role: selectedRole,
           status: 'pending',
           token: '', // Required field, but not used for access codes
-          email: users.find(u => u.id === selectedUserId)?.email || ''
+          email: profiles.email
         }]);
 
       if (insertError) throw insertError;
@@ -87,7 +104,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
       setGeneratedCode(accessCode);
       toast({
         title: 'Access code generated!',
-        description: 'The access code has been created for the selected user.'
+        description: `Access code created for ${profiles.name || profiles.email}.`
       });
 
       if (onCodeGenerated) {
@@ -118,24 +135,11 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
   };
 
   const resetForm = () => {
-    setSelectedUserId('');
+    setUserEmail('');
     setSelectedRole('Member');
     setGeneratedCode(null);
     setCopied(false);
   };
-
-  if (loadingUsers) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin mr-2" />
-            Loading users...
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
@@ -164,7 +168,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
                 </Button>
               </div>
               <p className="text-sm text-green-700 mt-2">
-                Share this code with the selected user so they can join your company.
+                Share this code with the user so they can join your company.
               </p>
             </div>
             <Button onClick={resetForm} variant="outline" className="w-full">
@@ -174,19 +178,15 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
         ) : (
           <form onSubmit={generateAccessCode} className="space-y-4">
             <div>
-              <Label htmlFor="user">Select User</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name || user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="user-email">User Email</Label>
+              <Input
+                id="user-email"
+                type="email"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                placeholder="Enter user's email address"
+                required
+              />
             </div>
 
             <div>
@@ -203,7 +203,7 @@ const AccessCodeGenerator: React.FC<AccessCodeGeneratorProps> = ({ companyId, on
               </Select>
             </div>
 
-            <Button type="submit" disabled={loading || !selectedUserId} className="w-full">
+            <Button type="submit" disabled={loading || !userEmail.trim()} className="w-full">
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
